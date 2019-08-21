@@ -1,0 +1,4 @@
+discord
+yaml
+pynacl
+youtube-dl

@@ -1,5 +1,6 @@
 import logging
 import asyncio
+import yaml
 from textwrap import dedent
 
 import discord
@@ -12,10 +13,14 @@ handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w'
 handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
 logger.addHandler(handler)
 
-class MainClient(discord.Client, Commands):
-    def __init__(self, conf):
-        for attr in conf:
-            setattr(self, attr, conf[attr])
+class MainClient(discord.Client, discord.VoiceClient, Commands):
+    def __init__(self):
+        self.load_config()
+
+        for attr in self.config:
+            setattr(self, attr, self.config[attr])
+        
+        self.playing_cardgame = False
 
         pic_cmds = {
             'cmd_hug': {
@@ -106,6 +111,14 @@ class MainClient(discord.Client, Commands):
 
         return super(MainClient, self).__init__()
 
+    def load_config(self):
+        try:
+            with open('config/global.yaml') as f:
+                self.config = yaml.load(f, Loader=yaml.CSafeLoader)
+        except FileNotFoundError:
+            with open('config/global_sample.yaml') as f:
+                self.config = yaml.load(f, Loader=yaml.CSafeLoader)
+
     def on_ready(self):
         print('Logged on as %s' % (self.user))
         print('Set Prefix: %s' % self.prefix)
@@ -114,26 +127,27 @@ class MainClient(discord.Client, Commands):
             print(' - {0.name} ({0.id})'.format(guild))
 
     async def on_message(self, message):
-        print('Message from {0.author}: {0.content}'.format(message))
-        if message.content.startswith(self.prefix):
-            m = message.content[1:]
-            c = m.split(' ')[0]
+        if not message.author.bot:
+            print('Message from {0.author}: {0.content}'.format(message))
+            if message.content.startswith(self.prefix):
+                m = message.content[1:]
+                c = m.split(' ')[0]
 
-            if hasattr(self, 'cmd_' + c):
-                cmd = getattr(self, 'cmd_' + c)
+                if hasattr(self, 'cmd_' + c):
+                    cmd = getattr(self, 'cmd_' + c)
 
-                if ' ' in message.content:
-                    has_args = True
-                else:
-                    has_args = False
+                    if ' ' in message.content:
+                        has_args = True
+                    else:
+                        has_args = False
 
-                if not has_args:
-                    try:
-                        await cmd(message, None)
-                    except TypeError:
-                        await message.channel.send('```{0}```'.format(dedent(cmd.__doc__)))
-                else:
-                    try:
-                        await cmd(message, *m[len(c) + 1:].split(' '))
-                    except TypeError:
-                        await message.channel.send('```{0}```'.format(dedent(cmd.__doc__)))
+                    if not has_args:
+                        try:
+                            await cmd(message, None)
+                        except TypeError:
+                            await message.channel.send('```{0}```'.format(dedent(cmd.__doc__)))
+                    else:
+                        try:
+                            await cmd(message, *m[len(c) + 1:].split(' '))
+                        except TypeError:
+                            await message.channel.send('```{0}```'.format(dedent(cmd.__doc__)))
