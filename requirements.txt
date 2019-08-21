@@ -1,4 +1,4 @@
-discord
-yaml
+discord.py[voice]
+pyyaml
 pynacl
 youtube-dl
