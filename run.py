@@ -1,9 +1,12 @@
 import logging
 import subprocess
+import os
+import bot
+import gc
 
 def run():
     try:
-        from client import MainClient
+        from bot.client import MainClient
         
         client = MainClient()
         client.load_config()
@@ -14,16 +17,20 @@ def run():
         try:
             client.run(client.token)
         except AttributeError:
-            print('No Token specified. Exiting...')
-            exit()
+            if 'BOT_TOKEN' in os.environ:
+                client.token = os.environ['BOT_TOKEN']
+            else:
+                print('No Token specified. Exiting...')
+                exit()
 
         return True
 
     except ImportError:
         subprocess.call('pip install requirements.txt')
-        return False
+        run()
 
-while True:
-    r = run()
-    if r:
-        break
+    except KeyboardInterrupt:
+        gc.collect()
+        run()
+
+run()
