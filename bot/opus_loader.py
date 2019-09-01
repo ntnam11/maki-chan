@@ -11,7 +11,7 @@ def load_opus_lib(opus_libs=OPUS_LIBS):
 	shutil.copy("./.apt/usr/lib/x86_64-linux-gnu/mesa/libGL.so.1", "./.apt/usr/lib/x86_64-linux-gnu/libGL.so.1")
 	shutil.copy("./.apt/lib/x86_64-linux-gnu/libusb-1.0.so.0", "./.apt/usr/lib/x86_64-linux-gnu/libusb-1.0.so.0")
 	shutil.copy("./.apt/lib/x86_64-linux-gnu/libjson-c.so.2", "./.apt/usr/lib/x86_64-linux-gnu/libjson-c.so.2")
-	shutil.copy("./.apt/usr/lib/x86_64-linux-gnu/pulseaudio/libpulsecommon-8.0.so", "./.apt/usr/lib/x86_64-linux-gnu/libpulsecommon-8.0.so")
+	shutil.copy("./.apt/usr/lib/x86_64-linux-gnu/pulseaudio/libpulsecommon-11.1.so", "./.apt/usr/lib/x86_64-linux-gnu/libpulsecommon-11.1.so")
 	shutil.copy("./.apt/lib/x86_64-linux-gnu/libslang.so.2", "./.apt/usr/lib/x86_64-linux-gnu/libslang.so.2")
 
 	if platform.system() == 'Linux':

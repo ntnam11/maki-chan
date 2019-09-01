@@ -7,9 +7,11 @@ import gc
 def run():
     try:
         from bot.client import MainClient
+        from bot.opus_loader import load_opus_lib
         
         client = MainClient()
         client.load_config()
+        load_opus_lib()
 
         if not client.prefix:
             print('Prefix is not supported. Please choose a different one')
