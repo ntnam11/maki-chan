@@ -1,5 +1,6 @@
 import discord
 import logging
+from functools import wraps
 
 logger = logging.getLogger('Common')
 
@@ -11,9 +12,10 @@ async def delete_message(message):
         pass
 
 def owner_only(func):
+    @wraps(func)
     async def target_func(self, message, *args):
         if str(message.author) == self.owner_id:
-            await target_func(message, *args)
+            await func(message, *args)
         else:
             await message.channel.send('```autohotkey\nSorry. You do not have enough permissions to call this command :D```')
 
