@@ -1,11 +1,14 @@
 # Changelogs
 
-## [0.1.1] - 
+## [0.1.1] - 2019-09-01
 ### Added
-- README.md
 #### New Commands
--
+- changelog
+- flush
+### Modified
+- help
 ### Removed
+- restart
 - FFmpeg due to GitHub's recommended maximum file size 
 
 ## [0.1.0] - 2019-08-31

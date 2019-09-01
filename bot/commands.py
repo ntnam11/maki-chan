@@ -43,7 +43,7 @@ def _pic_func(func_obj):
         async def target_func(message, target, *args):
             '''
             Sends a pic
-            Command group: Pics
+            Command group: Pics with target
             Usage: {command_prefix}[action] [mention / text]
             Example: ~[action] / ~[action] @_Kotori_
             '''
@@ -65,7 +65,7 @@ def _pic_func(func_obj):
         async def notarget_func(message, *args):
             '''
             Sends a pic
-            Command group: pics
+            Command group: Pics
             Usage: {command_prefix}[action]
             Example: ~[action]
             '''
@@ -161,7 +161,7 @@ class Commands(MusicPlayer):
     async def cmd_lenny(self, message, *args):
         '''
         Sends a ( ͡° ͜ʖ ͡°)
-        Command group: pics
+        Command group: Pics
         Usage: {command_prefix}lenny
         Example: ~lenny
         '''
@@ -410,7 +410,7 @@ class Commands(MusicPlayer):
                 await message.channel.send("Here comes the next question!")
             time.sleep(1)
 
-        shutil.rmtree(dirpath)
+        shutil.rmtree(dirpath, ignore_errors=True)
 
         strresult = ""
         for x in userinfo:
@@ -462,7 +462,7 @@ class Commands(MusicPlayer):
         if self.voice_client.is_playing():
             self.voice_client.stop()
         await self.voice_client.disconnect()
-        await message.channel.send('```Left "%s"```' % self.voice_channel.name)
+        await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
         self.voice_channel = None
 
     async def cmd_play(self, message, *args):
@@ -627,16 +627,46 @@ class Commands(MusicPlayer):
         exit()
 
     @owner_only
-    async def cmd_restart(self, message, *args):
+    async def cmd_flush(self, message, *args):
         '''
-        Force a restart :D
+        Force a memory flush & clean all cache
         Command group: Owner only
-        Usage: {command_prefix}restart
-        Example: ~restart
+        Usage: {command_prefix}flush
+        Example: ~flush
         '''
-        if self.voice_client.is_connected():
-            if self.voice_client.is_playing():
-                self.voice_client.stop()
-            await self.voice_client.disconnect()
+        if self.voice_client:
+            if self.voice_client.is_connected():
+                if self.voice_client.is_playing():
+                    self.voice_client.stop()
+                await self.voice_client.disconnect()
         
-        raise KeyboardInterrupt
+        self.__init__()
+
+        await message.channel.send('```css\nDone```')
+        
+    async def cmd_changelog(self, message, *args):
+        '''
+        Show most recent changelog
+        Command group: Misc
+        Usage: {command_prefix}flush
+        Example: ~flush
+        '''
+        str_result = '```md'
+
+        with open('CHANGELOG.md') as f:
+            content = f.readlines()
+
+        _ = 0
+
+        for line in content:
+            if line != '\n':
+                str_result += line
+            else:
+                if _ == 1:
+                    break
+                _ += 1
+                str_result += line
+
+        str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */```'
+
+        await message.channel.send(str_result)

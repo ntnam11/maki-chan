@@ -23,14 +23,8 @@ def run():
             print('No Token specified. Exiting...')
             exit()
 
-        return True
-
     except ImportError:
         subprocess.call('pip install requirements.txt')
-        run()
-
-    except KeyboardInterrupt:
-        gc.collect()
         run()
 
 run()

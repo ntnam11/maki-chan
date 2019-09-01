@@ -23,6 +23,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
             setattr(self, attr, self.config[attr])
         
         self.playing_cardgame = False
+        self.voice_client = None
         self.voice_channel = None
         self.music_queue = []
         self.current_song = None
