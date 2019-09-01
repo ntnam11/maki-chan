@@ -133,7 +133,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
                 self.config = yaml.load(f, Loader=yaml.CSafeLoader)
 
         if 'BOT_TOKEN' in os.environ:
-            client.token = os.environ['BOT_TOKEN']
+            self.token = os.environ['BOT_TOKEN']
         
         if 'YOUTUBE_APIKEY' in os.environ:
             self.youtube_apikey = os.environ['YOUTUBE_APIKEY']
