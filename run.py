@@ -10,18 +10,16 @@ def run():
         
         client = MainClient()
         client.load_config()
+
         if not client.prefix:
             print('Prefix is not supported. Please choose a different one')
             exit()
             
         try:
             client.run(client.token)
-        except AttributeError:
-            if 'BOT_TOKEN' in os.environ:
-                client.token = os.environ['BOT_TOKEN']
-            else:
-                print('No Token specified. Exiting...')
-                exit()
+        except Exception as e:
+            print('No Token specified. Exiting...')
+            exit()
 
         return True
 

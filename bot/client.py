@@ -127,9 +127,13 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
         try:
             with open('config/global.yaml') as f:
                 self.config = yaml.load(f, Loader=yaml.CSafeLoader)
+            return
         except FileNotFoundError:
             with open('config/global_sample.yaml') as f:
                 self.config = yaml.load(f, Loader=yaml.CSafeLoader)
+
+        if 'BOT_TOKEN' in os.environ:
+            client.token = os.environ['BOT_TOKEN']
         
         if 'YOUTUBE_APIKEY' in os.environ:
             self.youtube_apikey = os.environ['YOUTUBE_APIKEY']
