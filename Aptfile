@@ -12,6 +12,7 @@ libx265-dev
 libmp3lame-dev
 libvpx-dev
 libgl1
+libvpx5
 ffmpeg
 libxdamage1
 libxfixes3
