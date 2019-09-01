@@ -2,7 +2,6 @@ import os
 import discord
 import youtube_dl
 import aiohttp
-import ffmpeg
 import asyncio
 import logging
 
