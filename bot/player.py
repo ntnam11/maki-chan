@@ -1,7 +1,6 @@
 import os
 import discord
 import youtube_dl
-import requests
 import aiohttp
 import ffmpeg
 import asyncio
