@@ -19,6 +19,43 @@ from .common import *
 
 logger = logging.getLogger('Command')
 
+MAX_SIF_CARDS = 5000
+SIF_IDOL_NAMES = {
+    'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
+    'honoka': 'Kousaka Honoka', 'kotori': 'Minami Kotori', 'maki': 'Nishikino Maki', 'nozomi': 'Toujou Nozomi', 'nico': 'Yazawa Nico',
+    'chika': 'Takami Chika', 'riko': 'Sakurauchi Riko', 'you': 'Watanabe You', 'yoshiko': 'Tsushima Yoshiko', 'yohane': 'Tsushima Yoshiko',
+    'ruby': 'Kurosawa Ruby', 'hanamaru': 'Kunikida Hanamaru', 'mari': 'Ohara Mari', 'dia': 'Kurosawa Dia', 'kanan': 'Matsuura Kanan',
+    'alpaca': 'Alpaca', 'shiitake': 'Shiitake', 'uchicchi': 'Uchicchi',
+    "chika's mother": "Chika's mother", "honoka's mother": "Honoka's mother", "kotori's mother": "Kotori's mother", "maki's mother": "Maki's mother", "nico's mother": "Nico's mother",
+    'cocoa': 'Yazawa Cocoa', 'cocoro': 'Yazawa Cocoro', 'cotarou': 'Yazawa Cotarou',
+    'ayumu': 'Uehara Ayumu', 'setsuna': 'Yuki Setsuna', 'shizuku': 'Osaka Shizuku',
+    'karin': 'Asaka Karin', 'kasumi': 'Nakasu Kasumi', 'ai': 'Miyashita Ai',
+    'rina': 'Tennoji Rina', 'kanata': 'Konoe Kanata', 'emma': 'Emma Verde',
+}
+SIF_NAME_LIST = [
+    'eli', 'rin', 'hanayo', 'honoka', 'kotori', 'maki', 'umi', 'nozomi', 'nico',
+    'chika', 'riko', 'you', 'yoshiko', 'ruby', 'hanamaru', 'mari', 'dia', 'kanan', 'yohane',
+    'alpaca', 'shiitake', 'uchicchi',
+    "chika's mother", "honoka's mother", "kotori's mother", "maki's mother", "nico's mother",
+    'cocoa', 'cocoro', 'cotarou',
+    'ayumu', 'ai', 'setsuna', 'kanata', 'karin', 'emma', 'rina', 'shizuku', 'kasumi',
+]
+SIF_COLOR_LIST = {
+    'Ayase Eli': 0x36B3DD, 'Hoshizora Rin': 0xF1C51F, 'Koizumi Hanayo': 0x54AB48,
+    'Kousaka Honoka': 0xE2732D, 'Minami Kotori': 0x8C9395, 'Nishikino Maki': 0xCC3554,
+    'Sonoda Umi': 0x1660A5, 'Toujou Nozomi': 0x744791, 'Yazawa Nico': 0xD54E8D,
+    'Takami Chika': 0xF0A20B, 'Sakurauchi Riko': 0xE9A9E8, 'Watanabe You': 0x49B9F9,
+    'Tsushima Yoshiko': 0x898989, 'Kurosawa Ruby': 0xFB75E4, 'Kunikida Hanamaru': 0xE6D617,
+    'Ohara Mari': 0xAE58EB, 'Kurosawa Dia': 0xF23B4C, 'Matsuura Kanan': 0x13E8AE,
+    'Kira Tsubasa': 0xFFFFFF, 'Toudou Erena': 0xFFFFFF, 'Yuuki Anju': 0xFFFFFF,
+    'Miyashita Ai': 0xFDA566, 'Yuki Setsuna': 0xFD767A, 'Emma Verde': 0xA6E37B,
+    'Asaka Karin': 0x96B1E8, 'Uehara Ayumu': 0xE792A9, 'Osaka Shizuku': 0xAEDCF4,
+    'Tennoji Rina': 0xAEABAE, 'Konoe Kanata': 0xD299DE, 'Nakasu Kasumi': 0xF2EB90,
+    'Alpaca': 0x8C9395, 'Shiitake': 0xE9A9E8, 'Uchicchi': 0x49B9F9,
+    "Chika's Mother": 0xF0A20B, "Honoka's Mother": 0xE2732D, "Kotori's Mother": 0x8C9395, "Maki's Mother": 0xCC3554, "Nico's Mother": 0xD54E8D,
+    'Yazawa Cocoa': 0xD54E8D, 'Yazawa Cocoro': 0xD54E8D, 'Yazawa Cotarou': 0xD54E8D,
+}
+
 async def _get_pic(img_type):
     url = "https://rra.ram.moe/i/r?type=%s" % (img_type)
     network_timeout = False
@@ -116,19 +153,27 @@ class Commands(MusicPlayer):
                 e.title = 'Command list'
                 for group in groups:
                     e.add_field(name=group, value=', '.join(groups[group]), inline=False)
+            await message.channel.send(embed=e)
         
         else:
             if 'cmd_' + command in dir(self):
-                e.title = command
                 desc = dedent(getattr(self, 'cmd_' + command).__doc__)
                 if '[action]' in desc:
                     desc = desc.replace('[action]', command)
-                e.description = desc
+
+                _ = {
+                    'Description': desc[:desc.index('Command group')],
+                    'Command group': desc[desc.index('Command group'):desc.index('Usage')].replace('Command group:', ''),
+                    'Usage': desc[desc.index('Usage'):desc.index('Example')].replace('Usage:', ''),
+                    'Example': desc[desc.index('Example'):].replace('Example:', '')
+                }
+                for k, v in _.items():
+                    e.add_field(name=k, value=v, inline=False)
+                
+                await message.channel.send('```css\nHelp for "%s"```' % command, embed=e)
             else:
                 await message.channel.send('Command not found')
                 return
-
-        await message.channel.send(embed=e)
     
     async def cmd_say(self, message, *args):
         '''
@@ -199,8 +244,8 @@ class Commands(MusicPlayer):
         Command group: Games
         Usage:
             {command_prefix}cardgame card_num [diff]
-            + card_num: Number of rounds to play
-            + diff:
+            - card_num: Number of rounds to play
+            - diff:
                 + easy/e: image size 300x300
                 + normal/n: image size 200 x 200
                 + hard/h: image size 150 x 150
@@ -214,10 +259,13 @@ class Commands(MusicPlayer):
             Idol names including: 
                 maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
                 ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
-                ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku and kasumi,
+                ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi,
                 and some support characters
 
             You must answer in 15 seconds :D
+        Example:
+            ~cardgame 10 ex
+            ~cardgame 1
         """
         try:
             if self.playing_cardgame:
@@ -289,33 +337,20 @@ class Commands(MusicPlayer):
                 time.sleep(1)
                 break
 
-        idol_name = {'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
-        'honoka': 'Kousaka Honoka', 'kotori': 'Minami Kotori', 'maki': 'Nishikino Maki', 'nozomi': 'Toujou Nozomi', 'nico': 'Yazawa Nico',
-        'chika': 'Takami Chika', 'riko': 'Sakurauchi Riko', 'you': 'Watanabe You', 'yoshiko': 'Tsushima Yoshiko', 'yohane': 'Tsushima Yoshiko',
-        'ruby': 'Kurosawa Ruby', 'hanamaru': 'Kunikida Hanamaru', 'mari': 'Ohara Mari', 'dia': 'Kurosawa Dia', 'kanan': 'Matsuura Kanan',
-        'alpaca': 'Alpaca', 'shiitake': 'Shiitake', 'uchicchi': 'Uchicchi',
-        "chika's mother": "Chika's mother", "honoka's mother": "Honoka's mother", "kotori's mother": "Kotori's mother", "maki's mother": "Maki's mother", "nico's mother": "Nico's mother",
-        'cocoa': 'Yazawa Cocoa', 'cocoro': 'Yazawa Cocoro', 'cotarou': 'Yazawa Cotarou',
-        'ayumu': 'Ayumu Uehara', 'setsuna': 'Setsuna Yuki', 'shizuku': 'Shizuku Osaka', 'karin': 'Karin Asaka', 'kasumi': 'Kasumi Nakasu', 'ai': 'Ai Miyashita', 'rina': 'Rina Tennoji', 'kanata': 'Kanata Konoe', 'emma': 'Emma Verde',
-        }
         # posx = [100, 125, 150, 175, 200, 225, 250, 275, 300]
         # posy = [200, 225, 250, 275, 300, 325, 350, 350, 375, 400, 425, 450, 475, 500, 525, 550]
         
         x_range = [100, 512 - diff_size[diff]]
         y_range = [200, 720 - diff_size[diff]]
-        card_max = 5000
-        found = False
-        network_timeout = False
+        network_timeout = 0
         stop = False
-        u1p = 0
-        u2p = 0
         dirpath = tempfile.mkdtemp()
 
         for count in range(0, card_num):
-            checktimeout = False
+            card_max = MAX_SIF_CARDS
 
             async with message.channel.typing():
-                while (found == False and network_timeout == False):
+                while (network_timeout < 5):
                     random_num = random.randint(1, card_max)
                     url = 'http://schoolido.lu/api/cards/%s' % (random_num)
                     logger.info('Searched %s' % (url))
@@ -330,22 +365,25 @@ class Commands(MusicPlayer):
                                     card_max = card_max / 2
                                 else:
                                     selected_idol = js['idol']['name']
-                                    if (selected_idol in idol_name.values()):
-                                        found = True
+                                    if (selected_idol in SIF_IDOL_NAMES.values()):
                                         img = 'http:%s' % (js['card_image'])
                                         selected_card = js['id']
                                         if img == "http:None":
                                             img = 'http:%s' % (js['card_idolized_image'])
                                         logger.info('Found %s' % (img))
-                                        card_max = 5000
                                         break
                                     else:
                                         pass
                             else:
                                 logger.info('Network timed out.')
-                                network_timeout = True
+                                network_timeout += 1
+                                time.sleep(5)
+                
+                if network_timeout == 5:
+                    await message.channel.send('```Something wrong with this API. Please contact bot owner```')
+                    self.playing_cardgame = False
+                    return
 
-                found = False
                 fd = urllib.request.urlopen(img)
                 image_file = io.BytesIO(fd.read())
                 im = Image.open(image_file)
@@ -363,14 +401,6 @@ class Commands(MusicPlayer):
 
                 await message.channel.send("Question %d of %d. Guess who?" % (count + 1, card_num), file=discord.File(temp_path))
 
-            name_list = ['eli', 'rin', 'hanayo', 'honoka', 'kotori', 'maki', 'umi', 'nozomi', 'nico',
-            'chika', 'riko', 'you', 'yoshiko', 'ruby', 'hanamaru', 'mari', 'dia', 'kanan', 'yohane',
-            'alpaca', 'shiitake', 'uchicchi',
-            "chika's mother", "honoka's mother", "kotori's mother", "maki's mother", "nico's mother",
-            'cocoa', 'cocoro', 'cotarou',
-            'ayumu', 'ai', 'setsuna', 'kanata', 'karin', 'emma', 'rina', 'shizuku', 'kasumi',
-            ]
-
             start = int(time.time())
             logger.info("Question %d at %s" % (count + 1, int(time.time())))
             strresult = ""
@@ -386,20 +416,20 @@ class Commands(MusicPlayer):
                     await message.channel.send("Time out! Here's the answer:\n%s, Card No.%s" % (selected_idol, selected_card), file=discord.File(path))
                     break
                 answ = response_message.content.lower()
-                if (answ in name_list and (idol_name[answ].lower() == selected_idol.lower())):
+                if (answ in SIF_NAME_LIST and (SIF_IDOL_NAMES[answ].lower() == selected_idol.lower())):
                     await message.channel.send("10 points for %s\n%s, Card No.%s" % (response_message.author.display_name, selected_idol, selected_card), file=discord.File(path))
                     if response_message.author.display_name not in userinfo:
                         userinfo[response_message.author.display_name] = 0
                     userinfo[response_message.author.display_name] += 10
                     for x in userinfo:
                         strresult += "%s: %s\n" % (x, userinfo[x])
-                    await message.channel.send("Round %d result:\n```%s```" % (count + 1, strresult))
+                    await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
                     time.sleep(2)
                     break
                 elif (answ == "stop" and response_message.author == user1st):
                     stop = True
                     break
-                elif (answ in name_list):
+                elif (answ in SIF_NAME_LIST):
                     await message.channel.send("Try again.")
             
             if stop == True:
@@ -416,7 +446,7 @@ class Commands(MusicPlayer):
         for x in userinfo:
             strresult += "%s: %s\n" % (x, userinfo[x])
 
-        await message.channel.send("Final result:\n```%s```" % (strresult))
+        await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
         await message.channel.send("Thanks for playing :)))")
 
         self.playing_cardgame = False
@@ -651,7 +681,7 @@ class Commands(MusicPlayer):
         Usage: {command_prefix}flush
         Example: ~flush
         '''
-        str_result = '```md'
+        str_result = '```md\n'
 
         with open('CHANGELOG.md') as f:
             content = f.readlines()
@@ -670,3 +700,204 @@ class Commands(MusicPlayer):
         str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */```'
 
         await message.channel.send(str_result)
+
+    async def cmd_cardinfo(self, message, card_id, *args, internal=False):
+        '''
+        Show info of a LLSIF card by id (idolized if defined)
+        Command group: LLSIF
+        Usage: {command_prefix}cardinfo card_id [idlz / idolized]
+        Example:
+            ~cardinfo 2145
+            ~cardinfo 2145 idlz
+        '''
+        promo = ''
+        getinfo = 'card_image'
+        card_id = str(card_id)
+
+        if not card_id.isdigit():
+            await message.channel.send('```prolog\nPlease type card id properly```')
+            return
+        else:
+            if args:
+                if args[0].lower() in ['idlz', 'idolized']:
+                    getinfo = 'card_idolized_image'
+
+        async with message.channel.typing():
+            url = 'http://schoolido.lu/api/cards/%s/' % (card_id)
+
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as r:
+                    if r.status == 200:
+                        js = await r.json()
+                        img = 'http:%s' % (js[getinfo])
+                        card_name = js['idol']['name']
+                        collection = js['translated_collection']
+                        release_date = js['release_date']
+                        is_promo = js['is_promo']
+                        attribute = js['attribute']
+                        ranking_attribute = js['ranking_attribute']
+                        if img == "http:None":
+                            if not internal:
+                                await message.channel.send('This card does not have unidolized version. Here\'s the idolized.')
+                            img = 'http:%s' % (js['card_idolized_image'])
+                        if is_promo == 'True':
+                            promo = 'Promo Card\n'
+                        else:
+                            promo = ''
+
+                        await message.channel.send(
+                            f'{img}\n```prolog\nCard No. {card_id}\nName: {card_name}\nCollection: {collection}\n' +
+                            f'Released date: {release_date}\n{promo}#{ranking_attribute} best {attribute} card```\n'
+                        )
+                        return 1
+                    else:
+                        if not internal:
+                            await message.channel.send('```prolog\nNetwork timed out or card not found.```')
+                        return 0
+
+    async def cmd_randomcard(self, message, *args):
+        '''
+        Show info of a random LLSIF card by idol / rarity
+        Command group: LLSIF
+        Usage:
+            {command_prefix}randomcard [idol] [rarity]
+            - idol: 
+                maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
+                ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
+                ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi,
+                and some support characters
+            - rarity: R, SR, SSR, UR
+        Example:
+            ~randomcard
+            ~randomcard kotori
+            ~randomcard ur
+            ~randomcard kotori ur
+        '''
+        if not args:
+            found = False
+            while not found:
+                random_id = random.randint(1, MAX_SIF_CARDS)
+                r = await self.cmd_cardinfo(message, random_id, internal=True)
+                if r:
+                    return
+
+        url = 'http://schoolido.lu/api/cardids/?'
+
+        args = list(args)
+
+        while args:
+            query = args.pop(0)
+            if query is not None:
+                if query in SIF_NAME_LIST:
+                    url += 'name=%s&' % SIF_IDOL_NAMES[query]
+                    logger.info('Set url: %s' % url)
+                
+                if query.lower() in ['r', 'sr', 'ssr', 'ur']:
+                    url += 'rarity=%s&' % query
+                    logger.info('Set url: %s' % url)
+            
+        async with message.channel.typing():
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as r:
+                    if r.status == 200:
+                        js = await r.json()
+                        card_num = random.choice(js)
+                        logger.info('Random card: %s' % card_num)
+                        await self.cmd_cardinfo(message, card_num)
+                        return
+                    else:
+                        logger.info('Error: %s' % r.status)
+                        await message.channel.send('```prolog\nHTTP Error %s. Please try again later.```' % r.status)
+                        return
+    
+    async def cmd_idolinfo(self, message, query, *args):
+        '''
+        Show info of a Love Live!! Idol
+        Command group: LLSIF
+        Usage:
+            {command_prefix}idolinfo [name]
+            - name:
+                maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
+                ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
+                ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi
+        Example:
+            ~idolinfo kotori
+        '''
+        logger.info("Searched for %s" % (query))
+
+        if query not in SIF_NAME_LIST:
+            await message.channel.send('```prolog\nIdol not found.```')
+            return
+
+        idol = SIF_IDOL_NAMES[query]
+
+        url = 'http://schoolido.lu/api/idols/%s/' % (idol)
+        logger.info("Getting info from %s" % (url))
+
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url) as r:
+                if r.status == 200:
+                    js = await r.json()
+
+                    name = js['name']
+                    jpname = js['japanese_name']
+                    age = js['age']
+                    school = js['school']
+                    birthday = js['birthday']
+                    astrological_sign = js['astrological_sign']
+                    blood = js['blood']
+                    height = js['height']
+                    measurements = js['measurements']
+                    favorite_food = js['favorite_food']
+                    least_favorite_food = js['least_favorite_food']
+                    hobbies = js['hobbies']
+                    attribute = js['attribute']
+                    year = js['year']
+                    main_unit = js['main_unit']
+                    sub_unit = js['sub_unit']
+
+                    try:
+                        cv_name = js['cv']['name']
+                    except:
+                        cv_name = js['cv']
+                    try:
+                        cv_nickname = js['cv']['nickname']
+                    except:
+                        cv_nickname = js['cv']
+
+                    summary = js['summary']
+                    chibi = js['chibi_small']
+
+                else:
+                    await message.channel.send('```prolog\nError occurs. Please try again later.```')
+
+        e = discord.Embed(title="Idol information", type="rich", color=SIF_COLOR_LIST[name])
+
+        e.set_thumbnail(url="%s" % chibi)
+
+        e.add_field(name="Name", value=name, inline=True)
+        e.add_field(name="Japanese", value=jpname, inline=True)
+        e.add_field(name="Age", value=age, inline=True)
+
+        e.add_field(name="Birthday", value=birthday, inline=True)
+        e.add_field(name="Sign", value=astrological_sign, inline=True)
+        e.add_field(name="Year", value=year, inline=True)
+        e.add_field(name="School", value=school, inline=True)
+
+        e.add_field(name="Blood type", value=blood, inline=True)
+        e.add_field(name="Height", value=height, inline=True)
+        e.add_field(name="Measurements", value=measurements, inline=True)
+
+        e.add_field(name="Favourite food", value=favorite_food, inline=True)
+        e.add_field(name="Dislike food", value=least_favorite_food, inline=True)
+        
+        e.add_field(name="Hobbies", value=hobbies, inline=True)
+        e.add_field(name="Main unit", value=main_unit, inline=True)
+        e.add_field(name="Sub unit", value=sub_unit, inline=True)
+
+        e.add_field(name="Summary", value=summary, inline=False)
+
+        e.add_field(name="CV", value=cv_name, inline=True)
+        e.add_field(name="Nickname", value=cv_nickname, inline=True)
+
+        await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)

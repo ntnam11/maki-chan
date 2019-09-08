@@ -1,5 +1,17 @@
 # Changelogs
 
+## [0.1.2] - 2019-09-08
+### Added
+- README.md
+- LICENSE.md
+#### New Commands
+- LLSIF: cardinfo, randomcard, idolinfo
+### Modified
+- Some markdowns
+- Help message
+### Bug fixes
+- Loading shared library on Heroku
+
 ## [0.1.1] - 2019-09-01
 ### Added
 #### New Commands
