@@ -322,6 +322,9 @@ class Commands(MusicPlayer):
             self.playing_cardgame = False
             return
 
+        def _cond(m):
+            return m.channel == message.channel
+
         if card_num > 50:
             checktimeout = False
             checkproceed = False
@@ -390,9 +393,6 @@ class Commands(MusicPlayer):
         start = int(time.time())
         logger.info("Game called at %s" % (start))
         
-        def _cond(m):
-            return m.channel == message.channel
-
         while True:
             if (int(time.time()) - start >= 10):
                 checkstart = True
