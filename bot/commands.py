@@ -288,10 +288,12 @@ class Commands(MusicPlayer):
         }
         try:
             card_num = int(card_num)
+            if card_num <= 0:
+                raise ValueError
         except ValueError:
             await message.channel.send("Please type number of rounds correctly")
             self.playing_cardgame = False
-            return            
+            return
 
         if not args:
             diff = 'normal'
@@ -413,6 +415,7 @@ class Commands(MusicPlayer):
                     response_message = None
                 if (checktimeout == True) or (not response_message):
                     logger.info("Time out.")
+                    checktimeout = False
                     await message.channel.send("Time out! Here's the answer:\n%s, Card No.%s" % (selected_idol, selected_card), file=discord.File(path))
                     break
                 answ = response_message.content.lower()
