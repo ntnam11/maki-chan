@@ -131,6 +131,7 @@ class Commands(MusicPlayer):
         await message.channel.send('```Set prefix: {0}```'.format(prefix))
         print('Set prefix: %s' % (prefix))
 
+    @owner_only
     async def cmd_setavatar(self, message, url):
         '''
         Set bot's avatar
@@ -274,8 +275,8 @@ class Commands(MusicPlayer):
                 + normal/n: image size 200 x 200
                 + hard/h: image size 150 x 150
                 + extreme/ex: image size 100 x 100
-                + custom: image size {custom_dimension} x {custom_dimension} 
-            - custom_dimension: an integer between 10 - 500
+                + custom/c: image size {custom_dimension} x {custom_dimension} 
+            - custom_dimension: an integer between 10 - 400
             Normal diff by default
 
             stop to stop the game (for who called the game :D)
@@ -338,7 +339,9 @@ class Commands(MusicPlayer):
                     if response_message.content == 'y':
                         checktimeout = True
                         checkproceed = True
-                    
+                    elif response_message.content == 'n':
+                        checktimeout = True
+
                 if checktimeout:
                     break
             
