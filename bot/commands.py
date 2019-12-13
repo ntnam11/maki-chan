@@ -131,6 +131,30 @@ class Commands(MusicPlayer):
         await message.channel.send('```Set prefix: {0}```'.format(prefix))
         print('Set prefix: %s' % (prefix))
 
+    async def cmd_setavatar(self, message, url):
+        '''
+        Set bot's avatar
+        Command group: Special
+        Usage {command_prefix}setavatar [url/image attachment]
+        Example: ~setavatar https://c7.uihere.com/files/736/106/562/maki-nishikino-tsundere-japanese-idol-love-live-sunshine-manga-others.jpg
+        '''
+        if isinstance(url, str):
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url) as r:
+                    if r.status == 404:
+                        await message.channel.send('Hm... URL not found. Try again')
+                    elif r.status == 200:
+                        fp = await r.read()
+                        await self.user.edit(avatar=fp)
+        else:
+            if len(message.attachments) > 0:
+                a = message.attachments[0]
+                fp = await message.attachments[0].read()
+                await self.user.edit(avatar=fp)
+            pass
+        await message.channel.send('```uwu new avatar```')
+        print('Set avatar: %s' % (url))
+
     async def cmd_help(self, message, command, *args, **kwargs):
         '''
         Display help
@@ -243,13 +267,15 @@ class Commands(MusicPlayer):
         Play LLSIF card guessing game
         Command group: Games
         Usage:
-            {command_prefix}cardgame card_num [diff]
+            {command_prefix}cardgame card_num [diff] [custom_dimension]
             - card_num: Number of rounds to play
             - diff:
                 + easy/e: image size 300x300
                 + normal/n: image size 200 x 200
                 + hard/h: image size 150 x 150
                 + extreme/ex: image size 100 x 100
+                + custom: image size {custom_dimension} x {custom_dimension} 
+            - custom_dimension: an integer between 10 - 500
             Normal diff by default
 
             stop to stop the game (for who called the game :D)
@@ -295,16 +321,60 @@ class Commands(MusicPlayer):
             self.playing_cardgame = False
             return
 
+        if card_num > 50:
+            checktimeout = False
+            checkproceed = False
+            start = int(time.time())
+            await message.channel.send("You really wanna play %s rounds? .-. Hm... Type `y` to proceed in 10 seconds, or `n` to quit" % card_num)
+
+            while True:
+                if (int(time.time() - start) >= 5):
+                    checktimeout = True
+                try:
+                    response_message = await self.wait_for('message', check=_cond, timeout=10)
+                except asyncio.TimeoutError:
+                    checktimeout = True
+                else:
+                    if response_message.content == 'y':
+                        checktimeout = True
+                        checkproceed = True
+                    
+                if checktimeout:
+                    break
+            
+            if not checkproceed:
+                await message.channel.send("Next time choose a smaller number of rounds :D")
+                self.playing_cardgame = False
+                return
+
         if not args:
             diff = 'normal'
         else:
             diff = args[0]
             if diff in diff_size:
                 pass
+            elif diff == 'custom' or diff == 'c':
+                if not args:
+                    await message.channel.send("Please add a width (height) for custom difficulty. E.g. `custom 50`")
+                    self.playing_cardgame = False
+                    return
+
+                try:
+                    dim = int(args[1])
+                except ValueError:
+                    await message.channel.send("Please type custom width (height) correctly (10 - 500)")
+                    self.playing_cardgame = False
+                    return
+
+                if dim < 10 or dim > 400:
+                    await message.channel.send("Please type custom width (height) correctly (10 - 500)")
+                    self.playing_cardgame = False
+                    return
+                diff_size[diff] = dim
             else:
                 await message.channel.send("Diff %s not found .-." % diff)
                 self.playing_cardgame = False
-                return
+                return           
 
         user1st = message.author
         userinfo = {user1st.display_name: 0}

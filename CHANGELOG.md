@@ -1,5 +1,16 @@
 # Changelogs
 
+## [0.1.3] - 2019-12-13
+### Added
+#### New Commands
+- setavatar
+### Modified
+- cardgame custom difficulty
+### Bug fixed
+- cardgame timeout bug (thanks to Uehara Ayumu#6011)
+- cardgame allows negative number (thanks to Uehara Ayumu#6011)
+- music: next song must be manually called
+
 ## [0.1.2] - 2019-09-08
 ### Added
 - README.md
