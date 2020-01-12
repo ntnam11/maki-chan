@@ -139,6 +139,9 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		if 'YOUTUBE_APIKEY' in os.environ:
 			self.youtube_apikey = os.environ['YOUTUBE_APIKEY']
 
+		if 'OWNER_ID' in os.environ:
+			self.owner_id = os.environ['OWNER_ID']
+
 	def on_ready(self):
 		print('Logged on as %s' % (self.user))
 		print('Set Prefix: %s' % self.prefix)
@@ -171,3 +174,13 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							await cmd(message, *m[len(c) + 1:].split(' '))
 						except TypeError:
 							await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
+			if type(message.channel) == discord.channel.DMChannel:
+				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
+				if len(message.attachments) != 0:
+					for a in message.attachments:
+						msg += f'\n{a.url}'
+				for guild in self.guilds:
+					for member in guild.members:
+						if str(member.id) == str(self.owner_id):
+							await member.send(msg)
+							return

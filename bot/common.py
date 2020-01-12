@@ -14,7 +14,7 @@ async def delete_message(message):
 def owner_only(func):
     @wraps(func)
     async def target_func(self, message, *args):
-        if str(message.author) == self.owner_id:
+        if str(message.author.id) == str(self.owner_id):
             await func(self, message, *args)
         else:
             await message.channel.send('```autohotkey\nSorry. You do not have enough permissions to call this command :D```')
