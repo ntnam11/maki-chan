@@ -977,3 +977,22 @@ class Commands(MusicPlayer):
         e.add_field(name="Nickname", value=cv_nickname, inline=True)
 
         await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)
+
+    @owner_only
+    async def cmd_message(self, message, uid, content, *args):
+        '''
+        Send a message to a user
+        Command group: Owner only
+        Usage:
+            {command_prefix}message [uid] [content]
+            - uid: User id
+            - content: message to send
+        Example:
+            ~message 309579216322691073 Hi!
+        '''
+        for guild in self.guilds:
+            for member in guild.members:
+                if member.id == int(uid):
+                    await member.send(content + ' '.join(args))
+                    return
+        await message.channel.send('```User not found. Perhaps you don\'t share the same server with the user```')

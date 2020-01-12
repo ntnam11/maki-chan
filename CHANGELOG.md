@@ -1,5 +1,10 @@
 # Changelogs
 
+## [0.1.4] - 2020-01-12
+### Added
+#### New Commands
+- message
+
 ## [0.1.3] - 2019-12-13
 ### Added
 #### New Commands
