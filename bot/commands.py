@@ -734,11 +734,11 @@ class Commands(MusicPlayer):
 		Usage: {command_prefix}shutdown
 		Example: ~shutdown
 		'''
-        if self.voice_client:
-            if self.voice_client.is_connected():
-                if self.voice_client.is_playing():
-                    self.voice_client.stop()
-                await self.voice_client.disconnect()
+		if self.voice_client:
+			if self.voice_client.is_connected():
+				if self.voice_client.is_playing():
+					self.voice_client.stop()
+				await self.voice_client.disconnect()
 		
 		await message.channel.send(':wave:')
 		exit()
