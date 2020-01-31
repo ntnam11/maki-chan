@@ -1,5 +1,12 @@
 # Changelogs
 
+## [0.1.5] - 2020-01-31
+### Added
+#### New Commands
+- debug
+### Bug fixed
+- flush causes Exception
+
 ## [0.1.4] - 2020-01-12
 ### Added
 #### New Commands
@@ -37,7 +44,7 @@
 - help
 ### Removed
 - restart
-- FFmpeg due to GitHub's recommended maximum file size 
+- FFmpeg due to GitHub's recommended maximum file size
 
 ## [0.1.0] - 2019-08-31
 ### Added

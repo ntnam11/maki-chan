@@ -3,9 +3,10 @@ import subprocess
 import os
 import bot
 import gc
+import discord
+import asyncio
 
-
-def run():
+async def run():
     try:
         from bot.client import MainClient
         from bot.opus_loader import load_opus_lib
@@ -19,13 +20,16 @@ def run():
             exit()
             
         try:
-            client.run(client.token)
-        except Exception as e:
+            await client.start(client.token)
+        except discord.LoginFailure:
             print('No Token specified. Exiting...')
             exit()
+        except Exception as e:
+            pass
 
     except ImportError:
         subprocess.call('pip install requirements.txt')
-        run()
+        await run()
 
-run()
+loop = asyncio.get_event_loop()
+loop.run_until_complete(run())
