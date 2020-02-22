@@ -14,33 +14,13 @@ from threading import Timer
 from textwrap import dedent
 
 import discord
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image
 from .player import MusicPlayer
+from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST, MAX_SIF_CARDS
 from .common import *
 
 logger = logging.getLogger('Command')
 
-MAX_SIF_CARDS = 5000
-SIF_IDOL_NAMES = {
-	'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
-	'honoka': 'Kousaka Honoka', 'kotori': 'Minami Kotori', 'maki': 'Nishikino Maki', 'nozomi': 'Toujou Nozomi', 'nico': 'Yazawa Nico',
-	'chika': 'Takami Chika', 'riko': 'Sakurauchi Riko', 'you': 'Watanabe You', 'yoshiko': 'Tsushima Yoshiko', 'yohane': 'Tsushima Yoshiko',
-	'ruby': 'Kurosawa Ruby', 'hanamaru': 'Kunikida Hanamaru', 'mari': 'Ohara Mari', 'dia': 'Kurosawa Dia', 'kanan': 'Matsuura Kanan',
-	'alpaca': 'Alpaca', 'shiitake': 'Shiitake', 'uchicchi': 'Uchicchi',
-	"chika's mother": "Chika's mother", "honoka's mother": "Honoka's mother", "kotori's mother": "Kotori's mother", "maki's mother": "Maki's mother", "nico's mother": "Nico's mother",
-	'cocoa': 'Yazawa Cocoa', 'cocoro': 'Yazawa Cocoro', 'cotarou': 'Yazawa Cotarou',
-	'ayumu': 'Uehara Ayumu', 'setsuna': 'Yuki Setsuna', 'shizuku': 'Osaka Shizuku',
-	'karin': 'Asaka Karin', 'kasumi': 'Nakasu Kasumi', 'ai': 'Miyashita Ai',
-	'rina': 'Tennoji Rina', 'kanata': 'Konoe Kanata', 'emma': 'Emma Verde',
-}
-SIF_NAME_LIST = [
-	'eli', 'rin', 'hanayo', 'honoka', 'kotori', 'maki', 'umi', 'nozomi', 'nico',
-	'chika', 'riko', 'you', 'yoshiko', 'ruby', 'hanamaru', 'mari', 'dia', 'kanan', 'yohane',
-	'alpaca', 'shiitake', 'uchicchi',
-	"chika's mother", "honoka's mother", "kotori's mother", "maki's mother", "nico's mother",
-	'cocoa', 'cocoro', 'cotarou',
-	'ayumu', 'ai', 'setsuna', 'kanata', 'karin', 'emma', 'rina', 'shizuku', 'kasumi',
-]
 SIF_COLOR_LIST = {
 	'Ayase Eli': 0x36B3DD, 'Hoshizora Rin': 0xF1C51F, 'Koizumi Hanayo': 0x54AB48,
 	'Kousaka Honoka': 0xE2732D, 'Minami Kotori': 0x8C9395, 'Nishikino Maki': 0xCC3554,
@@ -117,7 +97,7 @@ def _pic_func(func_obj):
 				await delete_message(message)
 		return notarget_func
 
-class Commands(MusicPlayer):
+class Commands(MusicPlayer, Games):
 	def __init__(self):
 		return super(Commands, self).__init__()
 
@@ -263,279 +243,6 @@ class Commands(MusicPlayer):
 						return {'error': True, 'message': 'HTTP Error %s. Please try again.' % r.status}
 
 		return {'error': False, 'url': url}
-
-	async def cmd_cardgame(self, message, card_num, *args):
-		"""
-		Play LLSIF card guessing game
-		If the bot stucks, try {command_prefix}flush to clear its cache
-		Command group: Games
-		Usage:
-			{command_prefix}cardgame card_num [diff] [custom_dimension]
-			- card_num: Number of rounds to play
-			- diff:
-				+ easy/e: image size 300x300
-				+ normal/n: image size 200 x 200
-				+ hard/h: image size 150 x 150
-				+ extreme/ex: image size 100 x 100
-				+ custom/c: image size {custom_dimension} x {custom_dimension} 
-			- custom_dimension: an integer between 10 - 400
-			Normal diff by default
-
-			stop to stop the game (for who called the game :D)
-
-			Just type the answer without prefix :D
-			
-			Idol names including: 
-				maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
-				ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
-				ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi,
-				and some support characters
-
-			You must answer in 15 seconds :D
-		Example:
-			~cardgame 10 ex
-			~cardgame 1
-		"""
-		try:
-			try:
-				if self.playing_cardgame:
-					await message.channel.send("The game is currently being played. Enjoy!")
-					return
-			except AttributeError:
-				self.playing_cardgame = True
-
-			self.playing_cardgame = True
-
-			diff_size = {
-				'easy': 300,
-				'normal': 200,
-				'hard': 150,
-				'extreme': 100,
-				'e': 300,
-				'n': 200,
-				'h': 150,
-				'ex': 100
-			}
-			try:
-				card_num = int(card_num)
-				if card_num <= 0:
-					raise ValueError
-			except ValueError:
-				await message.channel.send("Please type number of rounds correctly")
-				self.playing_cardgame = False
-				return
-
-			def _cond(m):
-				return m.channel == message.channel
-
-			if card_num > 50:
-				checktimeout = False
-				checkproceed = False
-				start = int(time.time())
-				await message.channel.send("You really wanna play %s rounds? .-. Hm... Type `y` to proceed in 10 seconds, or `n` to quit" % card_num)
-
-				while True:
-					if (int(time.time() - start) >= 5):
-						checktimeout = True
-					try:
-						response_message = await self.wait_for('message', check=_cond, timeout=10)
-					except asyncio.TimeoutError:
-						checktimeout = True
-					else:
-						if response_message.content == 'y':
-							checktimeout = True
-							checkproceed = True
-						elif response_message.content == 'n':
-							checktimeout = True
-
-					if checktimeout:
-						break
-				
-				if not checkproceed:
-					await message.channel.send("Next time choose a smaller number of rounds :D")
-					self.playing_cardgame = False
-					return
-
-			if not args:
-				diff = 'normal'
-			else:
-				diff = args[0]
-				if diff in diff_size:
-					pass
-				elif diff == 'custom' or diff == 'c':
-					if not args:
-						await message.channel.send("Please add a width (height) for custom difficulty. E.g. `custom 50`")
-						self.playing_cardgame = False
-						return
-
-					try:
-						dim = int(args[1])
-					except ValueError:
-						await message.channel.send("Please type custom width (height) correctly (10 - 500)")
-						self.playing_cardgame = False
-						return
-
-					if dim < 10 or dim > 400:
-						await message.channel.send("Please type custom width (height) correctly (10 - 500)")
-						self.playing_cardgame = False
-						return
-					diff_size[diff] = dim
-				else:
-					await message.channel.send("Diff %s not found .-." % diff)
-					self.playing_cardgame = False
-					return		   
-
-			user1st = message.author
-			userinfo = {user1st.display_name: 0}
-			struserlist = ""
-			strresult = ""
-			
-			await message.channel.send("Game starts in 10 seconds. Be ready!")
-			checkstart = False
-			checktimeout = False
-			start = int(time.time())
-			logger.info("Game called at %s" % (start))
-			
-			while True:
-				if (int(time.time()) - start >= 10):
-					checkstart = True
-				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=10)
-				except asyncio.TimeoutError:
-					checkstart = True
-				else:
-					if (response_message.content == 'stop'):
-						await message.channel.send("Game abandoned. Thanks for calling me :D")
-						self.playing_cardgame = False
-						return
-				
-				if (checkstart == True):
-					logger.info("Game starts at %s" % int(time.time()))
-					await message.channel.send("Music start!")
-					time.sleep(1)
-					break
-
-			# posx = [100, 125, 150, 175, 200, 225, 250, 275, 300]
-			# posy = [200, 225, 250, 275, 300, 325, 350, 350, 375, 400, 425, 450, 475, 500, 525, 550]
-			
-			x_range = [100, 512 - diff_size[diff]]
-			y_range = [200, 720 - diff_size[diff]]
-			network_timeout = 0
-			stop = False
-			dirpath = tempfile.mkdtemp()
-
-			for count in range(0, card_num):
-				card_max = MAX_SIF_CARDS
-
-				async with message.channel.typing():
-					while (network_timeout < 5):
-						random_num = random.randint(1, card_max)
-						url = 'http://schoolido.lu/api/cards/%s' % (random_num)
-						logger.info('Searched %s' % (url))
-						async with aiohttp.ClientSession() as session:
-							async with session.get(url) as r:
-								if r.status == 404:
-									card_max = card_max / 2
-									pass
-								elif r.status == 200:
-									js = await r.json()
-									if 'detail' in js:
-										card_max = card_max / 2
-									else:
-										selected_idol = js['idol']['name']
-										if (selected_idol in SIF_IDOL_NAMES.values()):
-											img = 'http:%s' % (js['card_image'])
-											selected_card = js['id']
-											if img == "http:None":
-												img = 'http:%s' % (js['card_idolized_image'])
-											logger.info('Found %s' % (img))
-											break
-										else:
-											pass
-								else:
-									logger.info('Network timed out.')
-									network_timeout += 1
-									time.sleep(5)
-					
-					if network_timeout == 5:
-						await message.channel.send('```Something wrong with this API. Please contact bot owner```')
-						self.playing_cardgame = False
-						return
-
-					fd = urllib.request.urlopen(img)
-					image_file = io.BytesIO(fd.read())
-					im = Image.open(image_file)
-					path = "%s/%s.png" % (dirpath, selected_card)
-					im.save(path)
-
-					#Crop image and send
-					x = random.randint(*x_range)
-					y = random.randint(*y_range)
-					area = (x, y, x+diff_size[diff], y+diff_size[diff])
-					cropped_img = im.crop(area)
-
-					temp_path = "%s/%s_cropped.png" % (dirpath, selected_card)
-					cropped_img.save(temp_path)
-
-					await message.channel.send("Question %d of %d. Guess who?" % (count + 1, card_num), file=discord.File(temp_path))
-
-				start = int(time.time())
-				logger.info("Question %d at %s" % (count + 1, int(time.time())))
-				strresult = ""
-				while True:
-					if (int(time.time()) - start) >= 15:
-						checktimeout = True
-					try:
-						response_message = await self.wait_for('message', check=_cond, timeout=15)
-					except asyncio.TimeoutError:
-						response_message = None
-					if (checktimeout == True) or (not response_message):
-						logger.info("Time out.")
-						checktimeout = False
-						await message.channel.send("Time out! Here's the answer:\n%s, Card No.%s" % (selected_idol, selected_card), file=discord.File(path))
-						break
-					answ = response_message.content.lower()
-					if (answ in SIF_NAME_LIST and (SIF_IDOL_NAMES[answ].lower() == selected_idol.lower())):
-						await message.channel.send("10 points for %s\n%s, Card No.%s" % (response_message.author.display_name, selected_idol, selected_card), file=discord.File(path))
-						if response_message.author.display_name not in userinfo:
-							userinfo[response_message.author.display_name] = 0
-						userinfo[response_message.author.display_name] += 10
-						for x in userinfo:
-							strresult += "%s: %s\n" % (x, userinfo[x])
-						await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
-						time.sleep(2)
-						break
-					elif (answ == "stop" and response_message.author == user1st):
-						stop = True
-						break
-					elif (answ in SIF_NAME_LIST):
-						await message.channel.send("Try again.")
-				
-				if stop == True:
-					await message.channel.send("Ok. The game stopped!")
-					break
-
-				if count + 1 != card_num:
-					await message.channel.send("Here comes the next question!")
-				time.sleep(1)
-
-			shutil.rmtree(dirpath, ignore_errors=True)
-
-			strresult = ""
-			for x in userinfo:
-				strresult += "%s: %s\n" % (x, userinfo[x])
-
-			await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
-			await message.channel.send("Thanks for playing :)))")
-
-			self.playing_cardgame = False
-		except Exception as e:
-			try:
-				errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
-				await message.channel.send(errmsg)
-			except:
-				pass
-			self.playing_cardgame = False
 
 	async def cmd_join(self, message, *args):
 		'''
@@ -757,6 +464,7 @@ class Commands(MusicPlayer):
 				await self.voice_client.disconnect()
 		
 		self.playing_cardgame = False
+		self.playing_songgame = False
 		self.voice_client = None
 		self.voice_channel = None
 		self.music_queue = []

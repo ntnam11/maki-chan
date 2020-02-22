@@ -17,6 +17,13 @@
             "request": "launch",
             "program": "${workspaceFolder}\\run.py",
             "console": "integratedTerminal"
-        }
+        },
+        {
+            "name": "Python: Discord Tests",
+            "type": "python",
+            "request": "launch",
+            "program": "${workspaceFolder}\\run_tests.py",
+            "console": "integratedTerminal"
+        },
     ]
 }

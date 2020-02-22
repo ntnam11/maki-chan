@@ -3,7 +3,9 @@ import logging
 import asyncio
 import yaml
 import shutil
+import traceback
 from textwrap import dedent
+from inspect import signature
 
 import discord
 
@@ -161,19 +163,58 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 
 					if ' ' in message.content:
 						has_args = True
+						actual_params = len(m[len(c) + 1:].split(' '))
 					else:
 						has_args = False
+						actual_params = 0
 
-					if not has_args:
-						try:
+					sig = signature(cmd).parameters
+					required_count = -1
+
+					for k, v in sig.items():
+						if v.kind.name == 'POSITIONAL_OR_KEYWORD':
+							required_count += 1
+
+					if required_count > actual_params:
+						doc = '```prolog\n{0}```'.format(dedent(cmd.__doc__))
+						doc = doc.replace('{command_prefix}', self.prefix)
+						await message.channel.send(doc)
+						return
+
+					try:
+						if not has_args:
 							await cmd(message, None)
-						except TypeError:
-							await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
-					else:
-						try:
+						else:
 							await cmd(message, *m[len(c) + 1:].split(' '))
-						except TypeError:
-							await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
+					except Exception as e:
+						try:
+							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
+							await message.channel.send(errmsg)
+						except:
+							pass
+					
+					# if not has_args:
+					# 	try:
+					# 		await cmd(message, None)
+					# 	except TypeError:
+					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
+					# 	except Exception as e:
+					# 		try:
+					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
+					# 			await message.channel.send(errmsg)
+					# 		except:
+					# 			pass
+					# else:
+					# 	try:
+					# 		await cmd(message, *m[len(c) + 1:].split(' '))
+					# 	except TypeError:
+					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
+					# 	except Exception as e:
+					# 		try:
+					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
+					# 			await message.channel.send(errmsg)
+					# 		except:
+					# 			pass
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
 				if len(message.attachments) != 0:

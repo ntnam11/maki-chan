@@ -1,5 +1,14 @@
 # Changelogs
 
+## [0.2.0] - 2020-02-22
+### Added
+#### New Commands
+- songgame
+### Modified
+- separated game commands to another file for readability & maintainability
+- created a loop in run.py to prevent random crashes from Heroku
+- created base testing (although it hasn't been used yet)
+
 ## [0.1.5] - 2020-01-31
 ### Added
 #### New Commands
