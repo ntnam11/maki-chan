@@ -742,3 +742,40 @@ class Commands(MusicPlayer, Games):
 					await member.send(content + ' '.join(args))
 					return
 		await message.channel.send('```User not found. Perhaps you don\'t share the same server with the user```')
+	
+	@owner_only
+	async def cmd_listserver(self, message, *args):
+		'''
+		List joined server
+		Command group: Owner only
+		Usage:
+			{command_prefix}listserver
+		Example:
+			~listserver
+		'''
+		result = ''
+		for guild in self.guilds:
+			result += f'{guild.id}: {guild.name}\n'
+		await message.channel.send(f'```{result}```')
+
+	@owner_only
+	async def cmd_leaveserver(self, message, server_id, *args):
+		'''
+		Leave a server
+		Command group: Owner only
+		Usage:
+			{command_prefix}leaveserver [server_id]
+		Excample:
+			~leaveserver 332012392104912758
+		'''
+		try:
+			guild = self.get_guild(int(server_id))
+			if guild is not None:
+				await guild.leave()
+				await message.channel.send('```css\nDone```')
+				return
+		except ValueError:
+			await message.channel.send('```Invalid server ID```')
+		await message.channel.send('```prolog\nI\'m not in that server :(```')
+
+	# async def 

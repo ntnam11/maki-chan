@@ -1,5 +1,11 @@
 # Changelogs
 
+## [0.2.1] - 2020-
+### Added
+#### New Commands
+- listserver
+- leaveserver
+
 ## [0.2.0] - 2020-02-22
 ### Added
 #### New Commands

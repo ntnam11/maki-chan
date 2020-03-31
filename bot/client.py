@@ -176,10 +176,11 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							required_count += 1
 
 					if required_count > actual_params:
-						doc = '```prolog\n{0}```'.format(dedent(cmd.__doc__))
-						doc = doc.replace('{command_prefix}', self.prefix)
-						await message.channel.send(doc)
-						return
+						if c != 'help':
+							doc = '```prolog\n{0}```'.format(dedent(cmd.__doc__))
+							doc = doc.replace('{command_prefix}', self.prefix)
+							await message.channel.send(doc)
+							return
 
 					try:
 						if not has_args:

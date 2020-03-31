@@ -492,10 +492,10 @@ class Games:
 					break
 				if answ == 'hint':
 					await message.channel.send('''```python
-						Hm... What hint will you choose?\n
-						hint center (-1 point) - name of the center of this song\n
-						hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
-						hint word (-3 points) - a random word of song name (e.g. Snow)
+Hm... What hint will you choose?\n
+hint center (-1 point) - name of the center of this song\n
+hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
+hint word (-3 points) - a random word of song name (e.g. Snow)
 					```''')
 				elif answ.startswith('hint '):
 					htype = answ.replace('hint ', '')
