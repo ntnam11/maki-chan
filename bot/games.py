@@ -359,8 +359,12 @@ class Games:
 		else:
 			with open(cache_path, mode='rb') as f:
 				soup = BeautifulSoup(f.read(), 'html5lib')
-		tables = soup.find_all('table', {'class': 'article-table'})
-
+		tables = soup.find_all('table', {'class': 'article-table'})		
+		songs_available = []
+		for table in tables:
+			songs = table.find_all('a', {'class': None})
+			songs_available.extend(songs)
+		
 		try:
 			if self.playing_lyricgame:
 				await message.channel.send("The game is currently being played. Enjoy!")
@@ -456,18 +460,11 @@ class Games:
 				break
 
 		stop = False
-		song_folder = os.path.join(os.getcwd(), 'lyrics')
-		song_list = os.listdir(song_folder)
 
 		for count in range(0, round_num):
 			async with message.channel.typing():
-				choice = random.choice(song_list)
-				with open(os.path.join(song_folder, choice), encoding='utf-8') as f:
-					song_info = yaml.load(f, Loader=yaml.SafeLoader)
 
-				table = random.choice(tables)
-				songs = table.find_all('a', {'class': None})
-				song = random.choice(songs)
+				song = random.choice(songs_available)
 				song_name = song.text.strip()
 				song_url = song.attrs['href']
 				song_url_page = 'https://love-live.fandom.com/' + song_url
