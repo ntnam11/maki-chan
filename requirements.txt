@@ -1,7 +1,8 @@
-discord.py[voice]>=1.2.5
+discord.py[voice]>=1.3.2
 pyyaml
 pynacl
 youtube-dl
 Pillow
 html5lib
 beautifulsoup4
+requests
