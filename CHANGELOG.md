@@ -1,10 +1,17 @@
 # Changelogs
 
-## [0.2.1] - 2020-
+## [0.2.1] - 2020-04-05
 ### Added
 #### New Commands
 - listserver
 - leaveserver
+- songgame
+- lyricgame
+### Modified
+- rename songgame to lyricgame
+### Bug fixed
+- randomcard doesn't return expected result with capitalized query
+- fixed cat command
 
 ## [0.2.0] - 2020-02-22
 ### Added

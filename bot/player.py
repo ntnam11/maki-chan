@@ -27,19 +27,19 @@ logger = logging.getLogger('Player')
 
 class Song:
     def __init__(self, url, title, downloaded=False):
-        self.url = url
-        self.id = ''
+        if not url.startswith('https'):
+            self.id = url
+            self.url = 'https://www.youtube.com/watch?v=' + url
+        else:
+            self.id = url.split('?v=')[1]
+            self.url = url
+
         self.title = url
         self.downloading = False
         self.downloaded = downloaded
         self.file_path = ''
 
     def _download(self, cls):
-        if not self.url.startswith('https'):
-            self.id = self.url
-            self.url = 'https://www.youtube.com/watch?v=' + self.url
-        else:
-            self.id = self.url.split('?v=')[1]
 
         download = True
         
@@ -48,9 +48,14 @@ class Song:
 
         if not self.downloaded:
 
+            print(f'Downloading... {self.url}')
+
             with youtube_dl.YoutubeDL(ytdl_format_options) as ydl:
                 self.downloading = True
-                info = ydl.extract_info(self.url, download=download)
+                try:
+                    info = ydl.extract_info(self.url, download=download)
+                except youtube_dl.utils.DownloadError:
+                    return {'error': True}
                 self.title = info.get('title')
                 self.id = info.get('id')
                 # r = ydl.download([self.url])
@@ -101,13 +106,22 @@ class MusicPlayer:
         
         if query.startswith('https://www.youtube.com'):
             s = Song(query, None)
-            await self._add_to_queue(s)
+            r = await self._add_to_queue(s)
+            if r['error']:
+                await self.voice_text_channel.send('```fix\This video is not available :(```')
+                return
         
         else:
-            r = await self._youtube_search(query, maxResult=1)
+            r = await self._youtube_search(query, maxResult=10)
             if not r['error']:
-                s = Song(r['result'][0]['id'], r['result'][0]['title'])
-                await self._add_to_queue(s)
+                i = 0
+                while True:
+                    s = r['result'][i]
+                    song = Song(s['id'], s['title'])
+                    ar = await self._add_to_queue(song)
+                    if not ar['error']:
+                        break
+                    i += 1
 
     async def _add_to_queue(self, song_obj):
         self.music_queue.append(song_obj)
@@ -117,7 +131,9 @@ class MusicPlayer:
         for song in self.music_queue:
             if not song.downloaded and not song.downloading:
                 logger.info('Downloading %s' % song.id)
-                song._download(self)
+                r = song._download(self)
+                if r['error']:
+                    return r
             else:
                 logger.info('Skip downloading %s' % song.id)
 
@@ -128,6 +144,9 @@ class MusicPlayer:
     async def _process_queue(self):
         if len(self.music_queue) == 0:
             self.current_song = None
+            return
+
+        if not self.voice_client:
             return
 
         if self.voice_client.is_playing():

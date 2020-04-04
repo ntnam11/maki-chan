@@ -3,3 +3,5 @@ pyyaml
 pynacl
 youtube-dl
 Pillow
+html5lib
+beautifulsoup4

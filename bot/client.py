@@ -122,7 +122,12 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		if os.path.exists('audio_cache'):
 			shutil.rmtree('audio_cache')
 
+		if os.path.exists('game_cache'):
+			shutil.rmtree('game_cache')
+
 		os.mkdir('audio_cache')
+		os.mkdir('game_cache')
+		os.mkdir(os.path.join('game_cache', 'songs'))
 
 		return super(MainClient, self).__init__()
 

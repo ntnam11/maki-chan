@@ -8,11 +8,16 @@ import shutil
 import tempfile
 import time
 import urllib.request
+import requests
+import re
+
+import subprocess
 
 import aiohttp
 import discord
 import yaml
 from PIL import Image
+from bs4 import BeautifulSoup
 
 from .exceptions import *
 
@@ -40,6 +45,14 @@ SIF_NAME_LIST = [
 ]
 
 logger = logging.getLogger('Games')
+
+def normalize_text(s):
+	s = s.lower()
+	result = ''
+	for c in s:
+		if ord(c) in range(97, 123) or c == ' ':
+			result += c
+	return result
 
 class Games:
 	def __init__(self):
@@ -310,15 +323,15 @@ class Games:
 
 		self.playing_cardgame = False
 
-	async def cmd_songgame(self, message, round_num, *args):
+	async def cmd_lyricgame(self, message, round_num, *args):
 		"""
-		Play Love Live!! song guessing game
+		Play Love Live!! lyric guessing game
 		You will get 10 points for the first line, and -2 for each printed line. 5 lines maximum
 		You have 45 seconds to guess the song. Each hint will be printed out with the cost of 2 points
 		If the bot stucks, try {command_prefix}flush to clear its cache
 		Command group: Games
 		Usage:
-			{command_prefix}songgame round_num [diff]
+			{command_prefix}lyricgame round_num [diff]
 			- round_num: Number of rounds to play
 			- diff:
 				+ normal/n: from the first line to the last line of the song, sequentially
@@ -326,24 +339,36 @@ class Games:
 			Normal diff by default
 
 			"hint" to show a hint, including
-				"hint center": -1 point
 				"hint letter": -2 points
 				"hint word": -3 points
 			"stop" to stop the game (for who called the game :D)
 
 			Just type the answer without prefix :D
 		Example:
-			~songgame 10 hard
-			~songgame 1
+			~lyricgame 10 hard
+			~lyricgame 1
 		"""
+		cache_path = os.path.join('game_cache', 'songgame_all')
+		song_cache = os.path.join('game_cache', 'songs')
+		if not os.path.exists(cache_path):
+			resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
+			r = requests.get(resource_url)
+			with open(os.path.join('game_cache', 'songgame_all'), mode='wb+') as f:
+				f.write(r.content)
+			soup = BeautifulSoup(r.content, 'html5lib')
+		else:
+			with open(cache_path, mode='rb') as f:
+				soup = BeautifulSoup(f.read(), 'html5lib')
+		tables = soup.find_all('table', {'class': 'article-table'})
+
 		try:
-			if self.playing_songgame:
+			if self.playing_lyricgame:
 				await message.channel.send("The game is currently being played. Enjoy!")
 				return
 		except AttributeError:
-			self.playing_songgame = True
+			self.playing_lyricgame = True
 
-		self.playing_songgame = True
+		self.playing_lyricgame = True
 
 		try:
 			round_num = int(round_num)
@@ -439,15 +464,18 @@ class Games:
 				choice = random.choice(song_list)
 				with open(os.path.join(song_folder, choice), encoding='utf-8') as f:
 					song_info = yaml.load(f, Loader=yaml.SafeLoader)
-				
-				lyrics = song_info['lyrics']
-				song_name = song_info['name']
-				alt_name = []
-				if song_info['alt_name']:
-					alt_name = list(map(lambda f: f.replace(' ', ''), song_info['alt_name']))
-				song_name_jp = song_info['name_jp']
-				center = song_info['center']
-				hints = song_info['hints']
+
+				table = random.choice(tables)
+				songs = table.find_all('a', {'class': None})
+				song = random.choice(songs)
+				song_name = song.text.strip()
+				song_url = song.attrs['href']
+				song_url_page = 'https://love-live.fandom.com/' + song_url
+				r = requests.get(song_url_page)
+				soup =  BeautifulSoup(r.content, 'html5lib')
+
+				poem = soup.find_all('div', {'class': 'poem'})[0]
+				lyrics = poem.text.strip()
 
 				lines = list(filter(lambda f: f != '', lyrics.split('\n')))
 
@@ -461,7 +489,6 @@ class Games:
 			start = int(time.time())
 			logger.info("Question %d at %s" % (count + 1, int(time.time())))
 			strresult = ""
-			hint = iter(hints)
 			points = 12
 			lines = iter(lines[start_line:start_line + 5])
 			_lyrics = ''
@@ -493,7 +520,6 @@ class Games:
 				if answ == 'hint':
 					await message.channel.send('''```python
 Hm... What hint will you choose?\n
-hint center (-1 point) - name of the center of this song\n
 hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
 hint word (-3 points) - a random word of song name (e.g. Snow)
 					```''')
@@ -508,9 +534,6 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 						hint_arr[r] = song_name.split(' ')[r]
 						await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
 						subtract_points = 3
-					if htype == 'center':
-						await message.channel.send(f'The center of this song is {center}-chan')
-						subtract_points = 1
 					if htype == 'letter':
 						for i, e in enumerate(hint_arr):
 							if '-' not in e:
@@ -529,20 +552,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					if response_message.author.display_name not in userinfo:
 						userinfo[response_message.author.display_name] = 0
 					userinfo[response_message.author.display_name] -= subtract_points
-				a = answ.replace(' ', '')
-				found = False
-				highest_ratio = 0
-				for match in [
-					song_name.replace(' ', '').lower(),
-					song_name_jp.replace(' ', '').lower(),
-					*alt_name
-				]:
-					if a == match:
-						found = True
-					else:
-						if match.startswith(a):
-							highest_ratio = max(highest_ratio, difflib.SequenceMatcher(None, a, answ, match).ratio())
-				if found:
+				if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
 					await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
 					if response_message.author.display_name not in userinfo:
 						userinfo[response_message.author.display_name] = 0
@@ -553,10 +563,6 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
 					time.sleep(2)
 					break
-				
-				# ratio = difflib.SequenceMatcher(None, answ, song_name).quick_ratio()
-				if (highest_ratio >= 0.9):
-					await message.channel.send("%s? Almost there!" % answ)
 
 			if stop == True:
 				await message.channel.send("Ok. The game stopped!")
@@ -573,4 +579,302 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
 		await message.channel.send("Thanks for playing :)))")
 
+		self.playing_lyricgame = False
+
+#
+	async def cmd_songgame(self, message, round_num, *args):
+		"""
+		Play Love Live!! song guessing game
+		A random part of a Love Live!! song will be played.
+		You will have 45 seconds to guess what song is that.
+		If the bot stucks, try {command_prefix}flush to clear its cache
+		Command group: Games
+		Usage:
+			{command_prefix}songgame round_num [diff]
+			- round_num: Number of rounds to play
+			- diff:
+				+ easy/e: 20 seconds of that song
+				+ normal/n: 15 seconds
+				+ hard/h: 10 seconds
+				+ extra/ex: 5 seconds
+			Normal diff by default
+
+			"hint" to show a hint, including
+				"hint letter": -2 points
+				"hint word": -3 points
+			"stop" to stop the game (for who called the game :D)
+
+			Just type the answer without prefix :D
+		Example:
+			~songgame 10 hard
+			~songgame 1
+		"""
+		cache_path = os.path.join('game_cache', 'songgame_all')
+		song_cache = os.path.join('game_cache', 'songs')
+		if not os.path.exists(cache_path):
+			resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
+			r = requests.get(resource_url)
+			with open(os.path.join('game_cache', 'songgame_all'), mode='wb+') as f:
+				f.write(r.content)
+			soup = BeautifulSoup(r.content, 'html5lib')
+		else:
+			with open(cache_path, mode='rb') as f:
+				soup = BeautifulSoup(f.read(), 'html5lib')
+		tables = soup.find_all('table', {'class': 'article-table'})		
+		songs_available = []
+		for table in tables:
+			songs = table.find_all('a', {'class': None})
+			songs_available.extend(songs)
+		
+		try:
+			if self.playing_songgame:
+				await message.channel.send("The game is currently being played. Enjoy!")
+				return
+		except AttributeError:
+			self.playing_songgame = True
+
+		# if not self.is_connected():
+		await self.cmd_join(message)
+
+		try:
+			round_num = int(round_num)
+			if round_num <= 0:
+				raise ValueError
+		except ValueError:
+			await message.channel.send("Please type number of rounds correctly")
+			self.playing_songgame = False
+			return
+
+		def _cond(m):
+			return m.channel == message.channel
+
+		if round_num > 50:
+			checktimeout = False
+			checkproceed = False
+			start = int(time.time())
+			await message.channel.send("You really wanna play %s rounds? .-. Hm... Type `y` to proceed in 10 seconds, or `n` to quit" % round_num)
+
+			while True:
+				if (int(time.time() - start) >= 5):
+					checktimeout = True
+				try:
+					response_message = await self.wait_for('message', check=_cond, timeout=10)
+				except asyncio.TimeoutError:
+					checktimeout = True
+				else:
+					if response_message.content == 'y':
+						checktimeout = True
+						checkproceed = True
+					elif response_message.content == 'n':
+						checktimeout = True
+
+				if checktimeout:
+					break
+			
+			if not checkproceed:
+				await message.channel.send("Next time choose a smaller number of rounds :D")
+				self.playing_songgame = False
+				return
+		
+		easy_diff = ['easy', 'e']
+		normal_diff = ['normal', 'n']
+		hard_diff = ['hard', 'h']
+		extra_diff = ['extra', 'ex']
+		durations = {
+			'e': 20,
+			'easy': 20,
+			'n': 15,
+			'normal': 15,
+			'h': 10,
+			'hard': 10,
+			'ex': 5,
+			'extra': 5
+		}
+		diffs = [*easy_diff, *normal_diff, *hard_diff, *extra_diff]
+
+		if not args:
+			diff = 'normal'
+		else:
+			diff = args[0]
+			if diff in diffs:
+				pass
+			else:
+				await message.channel.send("Diff %s not found .-." % diff)
+				self.playing_songgame = False
+				return
+
+		duration = durations[diff]
+
+		user1st = message.author
+		userinfo = {user1st.display_name: 0}
+		struserlist = ""
+		strresult = ""
+		
+		await message.channel.send("Game starts in 5 seconds. Be ready!")
+		checkstart = False
+		checktimeout = False
+		start = int(time.time())
+		logger.info("Game called at %s" % (start))
+		
+		while True:
+			if (int(time.time()) - start >= 5):
+				checkstart = True
+			try:
+				response_message = await self.wait_for('message', check=_cond, timeout=5)
+			except asyncio.TimeoutError:
+				checkstart = True
+			else:
+				if (response_message.content == 'stop'):
+					await message.channel.send("Game abandoned. Thanks for calling me :D")
+					self.playing_songgame = False
+					return
+			
+			if (checkstart == True):
+				logger.info("Game starts at %s" % int(time.time()))
+				await message.channel.send("Music start!")
+				time.sleep(1)
+				break
+
+		stop = False
+
+		for count in range(0, round_num):
+			await message.channel.send(f'Preparing question {count + 1} of {round_num}...')
+			
+			song = random.choice(songs_available)
+			song_name = song.text.strip()
+			song_url = song.attrs['href']
+			song_url_page = 'https://love-live.fandom.com/' + song_url
+			r = requests.get(song_url_page)
+			soup =  BeautifulSoup(r.content, 'html5lib')
+
+			poem = soup.find_all('div', {'class': 'poem'})[0]
+			song_files = soup.find_all('div', {'class': 'ogg_player'})
+			song_file = random.choice(song_files)
+
+			for p in song_file.parents:
+				if p.name == 'td':
+					td = p
+					break
+
+			song_length = td.previous_sibling.text.strip()
+			seconds = int(song_length[-2:])
+			minutes = int(song_length[:-3])
+			total_seconds = minutes * 60 + seconds
+
+			song_onclick = song_file.find('button').attrs['onclick']
+			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
+
+			song_r = requests.get(song_url)
+			song_data = song_r.content
+			file_name = ''.join(e for e in song_name if e.isalnum())
+			with open(os.path.join(song_cache, file_name + '.ogg'), mode='wb+') as f:
+				f.write(song_data)
+
+			time_start = random.randint(0, total_seconds - duration)
+
+			subprocess.run(['ffmpeg', '-i', os.path.join(song_cache, file_name + '.ogg'), '-ss', str(time_start), '-to', str(time_start + duration), '-c', 'copy', os.path.join(song_cache, 'file.ogg'), '-y'])
+
+			# source = discord.PCMAudio(io.BytesIO(song_data))
+			source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), song_cache, 'file.ogg'), executable='ffmpeg')
+
+			await message.channel.send('What is this song?')
+			
+			self.voice_client.play(source)
+			
+			start = int(time.time())
+			logger.info("Question %d at %s" % (count + 1, int(time.time())))
+			strresult = ""
+			points = 10
+			hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
+			while True:
+				t = int(time.time()) - start
+				if t >= 45:
+					checktimeout = True
+				
+				try:
+					response_message = await self.wait_for('message', check=_cond, timeout=45)
+				except asyncio.TimeoutError:
+					checktimeout = True
+				
+				if (checktimeout == True):
+					logger.info("Time out.")
+					checktimeout = False
+					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
+					break
+				answ = response_message.content.lower()
+				if (answ == "stop" and response_message.author == user1st):
+					stop = True
+					break
+				if answ == 'hint':
+					await message.channel.send('''```python
+Hm... What hint will you choose?\n
+hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
+hint word (-3 points) - a random word of song name (e.g. Snow)
+					```''')
+				elif answ.startswith('hint '):
+					htype = answ.replace('hint ', '')
+					if htype == 'word':
+						_ = song_name.split(' ')
+						while True:
+							r = random.randint(0, len(_) - 1)
+							if _[r] not in hint_arr and r != '':
+								break
+						hint_arr[r] = song_name.split(' ')[r]
+						await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
+						subtract_points = 3
+					if htype == 'letter':
+						for i, e in enumerate(hint_arr):
+							if '-' not in e:
+								continue
+							r = random.randint(0, len(e) - 1)
+							if e[r] != '-':
+								continue
+							c = song_name.split(' ')[i][r] 
+							try:
+								s = e[:r] + c + e[r + 1:]
+							except IndexError:
+								s = e[:r] + c
+							hint_arr[i] = s
+						await message.channel.send(f'Letter hint for u: {" ".join(hint_arr)}')
+						subtract_points = 2
+					if response_message.author.display_name not in userinfo:
+						userinfo[response_message.author.display_name] = 0
+					userinfo[response_message.author.display_name] -= subtract_points
+				if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
+					await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
+					if response_message.author.display_name not in userinfo:
+						userinfo[response_message.author.display_name] = 0
+					userinfo[response_message.author.display_name] += points
+
+					for x in userinfo:
+						strresult += "%s: %s\n" % (x, userinfo[x])
+					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
+					time.sleep(2)
+					break
+
+			if stop == True:
+				await message.channel.send("Ok. The game stopped!")
+				break
+			
+			if self.voice_client.is_playing():
+				self.voice_client.stop()
+
+			if count + 1 != round_num:
+				await message.channel.send("Here comes the next question!")
+			time.sleep(1)
+
+		strresult = ""
+		for x in userinfo:
+			strresult += "%s: %s\n" % (x, userinfo[x])
+
+		await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
+		await message.channel.send("Thanks for playing :)))")
+
+		await self.cmd_leave(message)
+
 		self.playing_songgame = False
+
+		shutil.rmtree(song_cache)
+		os.mkdir(os.path.join('game_cache', 'songs'))
+
+#

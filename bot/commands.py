@@ -234,15 +234,16 @@ class Commands(MusicPlayer, Games):
 				async with session.get(url) as r:
 					if r.status == 200:
 						js = await r.json()
-						link = js['path']
-						url = "https://rra.ram.moe%s" % (link)
+						url = js['file']
+						# url = "https://rra.ram.moe%s" % (link)
 						break
 					else:
 						print('Error: %s' % r.status)
 						network_timeout = True
 						return {'error': True, 'message': 'HTTP Error %s. Please try again.' % r.status}
 
-		return {'error': False, 'url': url}
+		await message.channel.send(url)
+		# return {'error': False, 'url': url}
 
 	async def cmd_join(self, message, *args):
 		'''
@@ -259,6 +260,8 @@ class Commands(MusicPlayer, Games):
 			
 		try:
 			self.voice_client = await self.voice_channel.connect()
+			if not self.voice_client:
+				self.voice_client = self.voice_clients[0]
 		except asyncio.TimeoutError:
 			await message.channel.send('```css\nCould not connect to the voice channel in time```')
 			return
@@ -274,6 +277,7 @@ class Commands(MusicPlayer, Games):
 				return
 
 		await message.channel.send('```css\nConnected to "%s"```' % self.voice_channel.name)
+		return
 	
 	async def cmd_leave(self, message, *args):
 		'''
@@ -282,6 +286,9 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}leave
 		Example: ~leave
 		'''
+		if not self.voice_client and not self.voice_channel:
+			await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
+			return
 		if self.voice_client.is_playing():
 			self.voice_client.stop()
 		await self.voice_client.disconnect()
@@ -464,6 +471,7 @@ class Commands(MusicPlayer, Games):
 				await self.voice_client.disconnect()
 		
 		self.playing_cardgame = False
+		self.playing_lyricgame = False
 		self.playing_songgame = False
 		self.voice_client = None
 		self.voice_channel = None
@@ -587,11 +595,12 @@ class Commands(MusicPlayer, Games):
 		while args:
 			query = args.pop(0)
 			if query is not None:
+				query = query.lower()
 				if query in SIF_NAME_LIST:
 					url += 'name=%s&' % SIF_IDOL_NAMES[query]
 					logger.info('Set url: %s' % url)
 				
-				if query.lower() in ['r', 'sr', 'ssr', 'ur']:
+				if query in ['r', 'sr', 'ssr', 'ur']:
 					url += 'rarity=%s&' % query
 					logger.info('Set url: %s' % url)
 			
