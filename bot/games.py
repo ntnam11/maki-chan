@@ -649,8 +649,9 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
 			return
 
-		if self.voice_client.is_playing():
-			await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
+		if self.voice_client:
+			if self.voice_client.is_playing():
+				await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
 
 		if not self.voice_client:
 			r = await self.cmd_join(message)
