@@ -19,8 +19,7 @@ ytdl_format_options = {
     'logtostderr': False,
     'quiet': True,
     'no_warnings': True,
-    'default_search': 'auto',
-    'source_address': '0.0.0.0'
+    'default_search': 'auto'
 }
 
 logger = logging.getLogger('Player')
@@ -35,6 +34,10 @@ class Song:
             self.url = url
 
         self.title = url
+        
+        if title is not None:
+            self.title = title
+
         self.downloading = False
         self.downloaded = downloaded
         self.file_path = ''
@@ -58,7 +61,6 @@ class Song:
                     return {'error': True}
                 self.title = info.get('title')
                 self.id = info.get('id')
-                # r = ydl.download([self.url])
             
             self.downloaded = True
             self.downloading = False
@@ -96,16 +98,21 @@ class MusicPlayer:
 
         return {'error': False, 'result': result}
 
-    async def _process_query(self, *args):
+    async def _process_query(self, *args, **kwargs):
         query = ' '.join(args)
         if query.startswith('youtube') or query.startswith('yt'):
             try:
                 query = query.split(' ')[1]
             except IndexError:
                 return
+
+        if 'title' in kwargs:
+            title = kwargs['title']
+        else:
+            title = None
         
         if query.startswith('https://www.youtube.com'):
-            s = Song(query, None)
+            s = Song(query, title)
             r = await self._add_to_queue(s)
             if r['error']:
                 await self.voice_text_channel.send('```fix\This video is not available :(```')
@@ -141,6 +148,8 @@ class MusicPlayer:
 
         await self._process_queue()
 
+        return {'error': False}
+
     async def _process_queue(self):
         if len(self.music_queue) == 0:
             self.current_song = None
@@ -160,7 +169,7 @@ class MusicPlayer:
         await self.voice_text_channel.send('```fix\nNow playing: %s```' % self.current_song.title)
 
         try:
-            self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue, self.client.loop))
+            self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue(), self.loop))
         except discord.errors.ClientException:
             self.voice_client.connect()
-            self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue, self.client.loop))
+            self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue(), self.loop))

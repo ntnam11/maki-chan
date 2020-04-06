@@ -9,12 +9,15 @@ import urllib
 import io
 import shutil
 import traceback
+import os
+import requests
 
 from threading import Timer
 from textwrap import dedent
 
 import discord
 from PIL import Image
+from bs4 import BeautifulSoup
 from .player import MusicPlayer
 from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST, MAX_SIF_CARDS
 from .common import *
@@ -252,11 +255,16 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}join
 		Example: ~join
 		'''
+		if self.voice_client:
+			if self.voice_client.is_playing():
+				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now :(```')
+				return {'error': True}
+
 		try:
 			self.voice_channel = message.author.voice.channel
 		except AttributeError:
 			await message.channel.send('```css\nPlease join a voice channel first :D```')
-			return
+			return {'error': True}
 			
 		try:
 			self.voice_client = await self.voice_channel.connect()
@@ -264,20 +272,20 @@ class Commands(MusicPlayer, Games):
 				self.voice_client = self.voice_clients[0]
 		except asyncio.TimeoutError:
 			await message.channel.send('```css\nCould not connect to the voice channel in time```')
-			return
+			return {'error': True}
 		except discord.ClientException:
 			await message.channel.send('```css\nAlready connected to voice channel```')
-			return
+			return {'error': True}
 		except discord.opus.OpusNotLoaded:
 			try:
 				from opus_loader import load_opus_lib
 				load_opus_lib()
 			except RuntimeError:
 				await message.channel.send('```css\nError loading opus lib. Cannot join voice channel```')
-				return
+				return {'error': True}
 
 		await message.channel.send('```css\nConnected to "%s"```' % self.voice_channel.name)
-		return
+		return {'error': False}
 	
 	async def cmd_leave(self, message, *args):
 		'''
@@ -286,6 +294,8 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}leave
 		Example: ~leave
 		'''
+		if self.playing_radio:
+			self.force_stop_radio = True
 		if not self.voice_client and not self.voice_channel:
 			await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
 			return
@@ -294,6 +304,8 @@ class Commands(MusicPlayer, Games):
 		await self.voice_client.disconnect()
 		await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
 		self.voice_channel = None
+		self.voice_client = None
+		self.playing_radio = False
 
 	async def cmd_play(self, message, *args):
 		'''
@@ -326,7 +338,7 @@ class Commands(MusicPlayer, Games):
 		async with message.channel.typing():
 			await self._process_query(*args)
 
-	async def cmd_search(self, message, *args):
+	async def cmd_search(self, message, query, *args):
 		'''
 		Search a video on youtube, up to 10 results
 		Command group: Music
@@ -342,7 +354,7 @@ class Commands(MusicPlayer, Games):
 			return
 
 		async with message.channel.typing():
-			r = await self._youtube_search(' '.join(args))
+			r = await self._youtube_search(' '.join([query, *args]))
 
 			str_result = '```css\n'
 
@@ -392,7 +404,7 @@ class Commands(MusicPlayer, Games):
 			await self.cmd_join(message)
 
 		async with message.channel.typing():
-			await self._process_query('https://www.youtube.com/watch?v=' + r['result'][int(resp)]['id'])
+			await self._process_query('https://www.youtube.com/watch?v=' + r['result'][int(resp)]['id'], title=r['result'][int(resp)]['title'])
 
 	async def cmd_np(self, message, *args):
 		'''
@@ -401,6 +413,10 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}np
 		Example: ~np
 		'''
+		if self.playing_radio:
+			await message.channel.send('```fix\nNow playing non-stop Love Live!! songs```')
+			return
+
 		if self.current_song:
 			await message.channel.send('```fix\nNow playing: %s```\n%s' % (self.current_song.title, self.current_song.url))
 		else:
@@ -413,6 +429,12 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}skip
 		Example: ~skip
 		'''
+		if self.playing_radio:
+			if self.voice_client:
+				if self.voice_client.is_playing():
+					self.voice_client.stop()
+			# await self.cmd_llradio(message)
+			return
 		if self.current_song:
 			self.voice_client.stop()
 			await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
@@ -460,7 +482,7 @@ class Commands(MusicPlayer, Games):
 	async def cmd_flush(self, message, *args):
 		'''
 		Force a memory flush & clean all cache
-		Command group: Owner only
+		Command group: Special
 		Usage: {command_prefix}flush
 		Example: ~flush
 		'''
@@ -473,6 +495,7 @@ class Commands(MusicPlayer, Games):
 		self.playing_cardgame = False
 		self.playing_lyricgame = False
 		self.playing_songgame = False
+		self.playing_radio = False
 		self.voice_client = None
 		self.voice_channel = None
 		self.music_queue = []
@@ -787,4 +810,100 @@ class Commands(MusicPlayer, Games):
 			await message.channel.send('```Invalid server ID```')
 		await message.channel.send('```prolog\nI\'m not in that server :(```')
 
-	# async def 
+	# def _radio_loop(self, message):
+	# 	if not self.playing_radio:
+	# 		return
+	# 	asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop)
+
+	async def cmd_llradio(self, message, *args):
+		'''
+		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
+		Command group: Music
+		Usage:
+			{command_prefix}llradio
+		Example:
+			~llradio
+		'''
+		song_cache = os.path.join('game_cache', 'songs')
+		song_list = os.path.join('game_cache', 'song_list')
+		if not os.path.exists(song_list):
+			songs_available = self._create_song_list()
+		else:
+			with open(song_list, mode='r') as f:
+				songs_available = f.readlines()
+		
+		self.playing_radio = True
+
+		if self.force_stop_radio:
+			return
+
+		if not self.voice_client:
+			r = await self.cmd_join(message)
+			if r['error']:
+				return
+
+		while True:
+			song_url = random.choice(songs_available)
+			r = requests.get(song_url.strip())
+			soup =  BeautifulSoup(r.content, 'html5lib')
+
+			song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+			song_files = soup.find_all('div', {'class': 'ogg_player'})
+			song_file = random.choice(song_files)
+
+			for p in song_file.parents:
+				if p.name == 'td':
+					td = p
+					break
+
+			t = None
+
+			for p in song_file.parents:
+				if 'class' in p.attrs:
+					if 'tabbertab' in p.attrs['class']:
+						t = p
+						break
+				if 'id' in p.attrs:
+					if p.attrs['id'] == 'mw-content-text':
+						break
+
+			if t is None:
+				break
+
+			if t.attrs['title'].lower() != 'radio drama':
+					break
+
+		song_length = td.previous_sibling
+		song_name = song_length.previous_sibling.text.strip()
+
+		song_onclick = song_file.find('button').attrs['onclick']
+		song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
+
+		song_r = requests.get(song_url)
+		song_data = song_r.content
+		with open(os.path.join('game_cache', 'radio.ogg'), mode='wb+') as f:
+			f.write(song_data)
+
+		source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), 'game_cache', 'radio.ogg'), executable='ffmpeg')
+
+		await message.channel.send(f'```fix\nNow playing: {song_name}```')
+
+		self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop))
+
+	async def cmd_stop(self, message, *args):
+		'''
+		Force stop Love Live!! radio
+		Command group: Music
+		Usage: {command_prefix}stop
+		Example: ~stop
+		'''
+		if self.playing_radio:
+			self.force_stop_radio = True
+
+		if self.voice_client:
+			if self.voice_client.is_playing():
+				self.voice_client.stop()
+
+		await message.channel.send('```css\nDone```')
+
+		self.force_stop_radio = False

@@ -1,5 +1,14 @@
 # Changelogs
 
+## [0.2.2] - 2020-04-07
+### Added
+#### New Commands
+- llradio
+- stop
+### Bug fixed
+- songgame plays radio drama
+- play, search & all music related commands
+
 ## [0.2.1] - 2020-04-05
 ### Added
 #### New Commands

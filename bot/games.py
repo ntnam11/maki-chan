@@ -54,9 +54,44 @@ def normalize_text(s):
 			result += c
 	return result
 
+class _Song:
+	def __init__(self, url):
+		self.text = url
+		self.attrs = {
+			'href': url
+		}
+
 class Games:
 	def __init__(self):
 		pass
+
+	def _create_song_list(self):
+		resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
+		r = requests.get(resource_url)
+
+		soup = BeautifulSoup(r.content, 'html5lib')
+		
+		tables = soup.find_all('table', {'class': 'article-table'})		
+		songs_available = []
+		for table in tables:
+			songs = table.find_all('a', {'class': None})
+			song_urls = []
+
+			for song in songs:
+				song_urls.append('https://love-live.fandom.com' + song.attrs['href'])
+			
+			songs_available.extend(song_urls)
+
+		with open(os.path.join('game_cache', 'song_additional')) as f:
+			content = f.readlines()
+
+		for line in content:
+			songs_available.append(line.strip())
+		
+		with open(os.path.join('game_cache', 'song_list'), mode='w+') as f:
+			f.write('\n'.join(songs_available))
+
+		return songs_available
 
 	async def cmd_cardgame(self, message, card_num, *args):
 		"""
@@ -298,7 +333,7 @@ class Games:
 					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
 					time.sleep(2)
 					break
-				elif (answ == "stop" and response_message.author == user1st):
+				elif answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
 					stop = True
 					break
 				elif (answ in SIF_NAME_LIST):
@@ -329,6 +364,7 @@ class Games:
 		You will get 10 points for the first line, and -2 for each printed line. 5 lines maximum
 		You have 45 seconds to guess the song. Each hint will be printed out with the cost of 2 points
 		If the bot stucks, try {command_prefix}flush to clear its cache
+		Run {command_prefix}songgame update to update the database (for the bot's owner)
 		Command group: Games
 		Usage:
 			{command_prefix}lyricgame round_num [diff]
@@ -348,22 +384,21 @@ class Games:
 			~lyricgame 10 hard
 			~lyricgame 1
 		"""
-		cache_path = os.path.join('game_cache', 'songgame_all')
+		if round_num.lower() == 'update':
+			if self.check_owner(message):
+				self._create_song_list()
+				await message.channel.send('```css\nDatabase updated```')
+			else:
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
+			return
+
 		song_cache = os.path.join('game_cache', 'songs')
-		if not os.path.exists(cache_path):
-			resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
-			r = requests.get(resource_url)
-			with open(os.path.join('game_cache', 'songgame_all'), mode='wb+') as f:
-				f.write(r.content)
-			soup = BeautifulSoup(r.content, 'html5lib')
+		song_list = os.path.join('game_cache', 'song_list')
+		if not os.path.exists(song_list):
+			songs_available = self._create_song_list()
 		else:
-			with open(cache_path, mode='rb') as f:
-				soup = BeautifulSoup(f.read(), 'html5lib')
-		tables = soup.find_all('table', {'class': 'article-table'})		
-		songs_available = []
-		for table in tables:
-			songs = table.find_all('a', {'class': None})
-			songs_available.extend(songs)
+			with open(song_list, mode='r') as f:
+				songs_available = f.readlines()
 		
 		try:
 			if self.playing_lyricgame:
@@ -411,7 +446,7 @@ class Games:
 			
 			if not checkproceed:
 				await message.channel.send("Next time choose a smaller number of rounds :D")
-				self.playing_songgame = False
+				self.playing_lyricgame = False
 				return
 
 		normal_diff = ['normal', 'n']
@@ -426,7 +461,7 @@ class Games:
 				pass
 			else:
 				await message.channel.send("Diff %s not found .-." % diff)
-				self.playing_songgame = False
+				self.playing_lyricgame = False
 				return		   
 
 		user1st = message.author
@@ -450,7 +485,7 @@ class Games:
 			else:
 				if (response_message.content == 'stop'):
 					await message.channel.send("Game abandoned. Thanks for calling me :D")
-					self.playing_songgame = False
+					self.playing_lyricgame = False
 					return
 			
 			if (checkstart == True):
@@ -463,13 +498,11 @@ class Games:
 
 		for count in range(0, round_num):
 			async with message.channel.typing():
-
-				song = random.choice(songs_available)
-				song_name = song.text.strip()
-				song_url = song.attrs['href']
-				song_url_page = 'https://love-live.fandom.com/' + song_url
-				r = requests.get(song_url_page)
+				song_url = random.choice(songs_available)
+				r = requests.get(song_url)
 				soup =  BeautifulSoup(r.content, 'html5lib')
+
+				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
 
 				poem = soup.find_all('div', {'class': 'poem'})[0]
 				lyrics = poem.text.strip()
@@ -511,7 +544,7 @@ class Games:
 					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
 					break
 				answ = response_message.content.lower()
-				if (answ == "stop" and response_message.author == user1st):
+				if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
 					stop = True
 					break
 				if answ == 'hint':
@@ -585,6 +618,8 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		A random part of a Love Live!! song will be played.
 		You will have 45 seconds to guess what song is that.
 		If the bot stucks, try {command_prefix}flush to clear its cache
+		If you don't hear anything, try leave the voice channel & join again
+		Run {command_prefix}songgame update to update the database (for the bot's owner)
 		Command group: Games
 		Usage:
 			{command_prefix}songgame round_num [diff]
@@ -606,23 +641,30 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			~songgame 10 hard
 			~songgame 1
 		"""
-		cache_path = os.path.join('game_cache', 'songgame_all')
+		if round_num.lower() == 'update':
+			if self.check_owner(message):
+				self._create_song_list()
+				await message.channel.send('```css\nDatabase updated```')
+			else:
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
+			return
+
+		if self.voice_client.is_playing():
+			await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
+
+		if not self.voice_client:
+			r = await self.cmd_join(message)
+			if r['error']:
+				return
+
 		song_cache = os.path.join('game_cache', 'songs')
-		if not os.path.exists(cache_path):
-			resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
-			r = requests.get(resource_url)
-			with open(os.path.join('game_cache', 'songgame_all'), mode='wb+') as f:
-				f.write(r.content)
-			soup = BeautifulSoup(r.content, 'html5lib')
+		song_list = os.path.join('game_cache', 'song_list')
+		if not os.path.exists(song_list):
+			songs_available = self._create_song_list()
 		else:
-			with open(cache_path, mode='rb') as f:
-				soup = BeautifulSoup(f.read(), 'html5lib')
-		tables = soup.find_all('table', {'class': 'article-table'})		
-		songs_available = []
-		for table in tables:
-			songs = table.find_all('a', {'class': None})
-			songs_available.extend(songs)
-		
+			with open(song_list, mode='r') as f:
+				songs_available = f.readlines()
+				
 		try:
 			if self.playing_songgame:
 				await message.channel.send("The game is currently being played. Enjoy!")
@@ -631,7 +673,6 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			self.playing_songgame = True
 
 		# if not self.is_connected():
-		await self.cmd_join(message)
 
 		try:
 			round_num = int(round_num)
@@ -737,21 +778,36 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		for count in range(0, round_num):
 			await message.channel.send(f'Preparing question {count + 1} of {round_num}...')
 			
-			song = random.choice(songs_available)
-			song_name = song.text.strip()
-			song_url = song.attrs['href']
-			song_url_page = 'https://love-live.fandom.com/' + song_url
-			r = requests.get(song_url_page)
-			soup =  BeautifulSoup(r.content, 'html5lib')
+			while True:
+				song_url = random.choice(songs_available)
+				r = requests.get(song_url.strip())
+				soup =  BeautifulSoup(r.content, 'html5lib')
 
-			poem = soup.find_all('div', {'class': 'poem'})[0]
-			song_files = soup.find_all('div', {'class': 'ogg_player'})
-			song_file = random.choice(song_files)
+				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+				song_files = soup.find_all('div', {'class': 'ogg_player'})
+				song_file = random.choice(song_files)
 
-			for p in song_file.parents:
-				if p.name == 'td':
-					td = p
+				for p in song_file.parents:
+					if p.name == 'td':
+						td = p
+						break
+
+				t = None
+
+				for p in song_file.parents:
+					if 'class' in p.attrs:
+						if 'tabbertab' in p.attrs['class']:
+							t = p
+							break
+					if 'id' in p.attrs:
+						if p.attrs['id'] == 'mw-content-text':
+							break
+
+				if t is None:
 					break
+
+				if t.attrs['title'].lower() != 'radio drama':
+						break
 
 			song_length = td.previous_sibling.text.strip()
 			seconds = int(song_length[-2:])
@@ -799,7 +855,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
 					break
 				answ = response_message.content.lower()
-				if (answ == "stop" and response_message.author == user1st):
+				if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
 					stop = True
 					break
 				if answ == 'hint':

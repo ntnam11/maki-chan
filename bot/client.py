@@ -25,13 +25,16 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 			setattr(self, attr, self.config[attr])
 		
 		self.playing_cardgame = False
+		self.playing_lyricgame = False
+		self.playing_songgame = False
+		self.playing_radio = False
+		self.force_stop_radio = False
 		self.voice_client = None
 		self.voice_channel = None
 		self.music_queue = []
 		self.current_song = None
 		self.voice_text_channel = None
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
-
 		pic_cmds = {
 			'cmd_hug': {
 				'type': 'hug',
@@ -122,14 +125,20 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		if os.path.exists('audio_cache'):
 			shutil.rmtree('audio_cache')
 
-		if os.path.exists('game_cache'):
-			shutil.rmtree('game_cache')
-
 		os.mkdir('audio_cache')
-		os.mkdir('game_cache')
-		os.mkdir(os.path.join('game_cache', 'songs'))
+
+		game_cache_songs = os.path.join('game_cache', 'songs')
+		if os.path.exists(game_cache_songs):
+			shutil.rmtree(game_cache_songs)
+
+		os.mkdir(game_cache_songs)
 
 		return super(MainClient, self).__init__()
+
+	def check_owner(self, message):
+		if str(message.author.id) == str(self.owner_id):
+			return True
+		return False
 
 	def load_config(self):
 		try:

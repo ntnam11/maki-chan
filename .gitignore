@@ -3,3 +3,4 @@ __pycache__
 global.yaml
 audio_cache
 ffmpeg.exe
+*.ogg

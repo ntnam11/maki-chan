@@ -1,7 +1,7 @@
 discord.py[voice]>=1.3.2
 pyyaml
 pynacl
-youtube-dl
+youtube-dl>=2020.3.24
 Pillow
 html5lib
 beautifulsoup4
