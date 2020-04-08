@@ -147,7 +147,9 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		hour = h + time_zone
 		if hour > 24:
 			hour -= 24
-		if hour < active_from and hour > active_to:
+		if active_to > 24:
+			active_to -= 24
+		if hour <= active_from and hour >= active_to:
 			if message:
 				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
 			print('Sleep time...')
@@ -217,6 +219,8 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 					try:
 						if not has_args:
 							self.check_sleep(message)
+							if c == 'llradio':
+								await message.channel.send('If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot')
 							await cmd(message, None)
 						else:
 							self.check_sleep(message)

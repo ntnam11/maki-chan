@@ -818,7 +818,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			song_onclick = song_file.find('button').attrs['onclick']
 			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
 
-			song_r = requests.get(song_url)
+			song_r = requests.get(song_url.strip())
 			song_data = song_r.content
 			file_name = ''.join(e for e in song_name if e.isalnum())
 			with open(os.path.join(song_cache, file_name + '.ogg'), mode='wb+') as f:
