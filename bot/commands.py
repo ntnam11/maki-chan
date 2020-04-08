@@ -819,6 +819,7 @@ class Commands(MusicPlayer, Games):
 	async def cmd_llradio(self, message, *args):
 		'''
 		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
+		If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot
 		Command group: Music
 		Usage:
 			{command_prefix}llradio
@@ -844,8 +845,6 @@ class Commands(MusicPlayer, Games):
 				return
 
 		self.check_sleep(message)
-
-		await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 
 		while True:
 			song_url = random.choice(songs_available)
