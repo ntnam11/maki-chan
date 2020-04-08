@@ -20,6 +20,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 from .player import MusicPlayer
 from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST, MAX_SIF_CARDS
+from .exceptions import *
 from .common import *
 
 logger = logging.getLogger('Command')
@@ -306,8 +307,9 @@ class Commands(MusicPlayer, Games):
 		self.voice_channel = None
 		self.voice_client = None
 		self.playing_radio = False
+		self.force_stop_radio = False
 
-	async def cmd_play(self, message, *args):
+	async def cmd_play(self, message, query, *args):
 		'''
 		(Search and) Queue a youtube video url
 		Command group: Music
@@ -336,7 +338,7 @@ class Commands(MusicPlayer, Games):
 		self.voice_text_channel = message.channel
 
 		async with message.channel.typing():
-			await self._process_query(*args)
+			await self._process_query(*[query, *args])
 
 	async def cmd_search(self, message, query, *args):
 		'''
@@ -501,6 +503,8 @@ class Commands(MusicPlayer, Games):
 		self.music_queue = []
 		self.current_song = None
 		self.voice_text_channel = None
+		self.force_stop_radio = False
+		self.loop = False
 
 		await message.channel.send('```css\nDone```')
 		
@@ -733,6 +737,7 @@ class Commands(MusicPlayer, Games):
 
 		await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)
 
+	# @owner_only
 	async def cmd_debug(self, message, *args):
 		'''
 		Debug mode (For experts only)
@@ -743,14 +748,15 @@ class Commands(MusicPlayer, Games):
 			~debug self
 		'''
 		command = ' '.join(args)
-		forbidden = ['import', 'del', 'os', 'shutil', 'sys', 'open']
+		forbidden = ['import', 'del', 'os', 'shutil', 'sys', 'open', 'eval', 'exec']
 		for f in forbidden:
 			if command.startswith(f):
 				await message.channel.send('```python\nForbidden. Please try another command```')
 				return
 
 		try:
-			cmd_result = eval(command)
+			scope = locals().copy()
+			cmd_result = eval(command, scope)
 		except Exception as e:
 			cmd_result = repr(e)
 		result = '```python\n%s```' % (cmd_result)
@@ -810,11 +816,6 @@ class Commands(MusicPlayer, Games):
 			await message.channel.send('```Invalid server ID```')
 		await message.channel.send('```prolog\nI\'m not in that server :(```')
 
-	# def _radio_loop(self, message):
-	# 	if not self.playing_radio:
-	# 		return
-	# 	asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop)
-
 	async def cmd_llradio(self, message, *args):
 		'''
 		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
@@ -841,6 +842,10 @@ class Commands(MusicPlayer, Games):
 			r = await self.cmd_join(message)
 			if r['error']:
 				return
+
+		self.check_sleep(message)
+
+		await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 
 		while True:
 			song_url = random.choice(songs_available)
@@ -886,7 +891,9 @@ class Commands(MusicPlayer, Games):
 
 		source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), 'game_cache', 'radio.ogg'), executable='ffmpeg')
 
-		await message.channel.send(f'```fix\nNow playing: {song_name}```')
+		md = random.choice(['fix', 'css', 'prolog', 'autohotkey', 'bash', 'coffeescript', 'md', 'ml'])
+
+		await message.channel.send(f'```{md}\nNow playing: {song_name}```')
 
 		self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop))
 
@@ -907,3 +914,67 @@ class Commands(MusicPlayer, Games):
 		await message.channel.send('```css\nDone```')
 
 		self.force_stop_radio = False
+
+	async def cmd_loop(self, message, *args):
+		'''
+		Loop a song
+		Command group: Music
+		Usage: {command_prefix}loop
+		Example: ~loop
+		'''
+		if self.playing_radio:
+			await message.channel.send('```fix\nWell, u can\'t loop a radio bruh :|```')
+			return
+		
+		if not self.voice_client:
+			await message.channel.send('```fix\nNothing to loop at the moment```')
+
+		self.loop = not self.loop
+
+		if self.loop:
+			await message.channel.send('```prolog\nLoop: on```')
+		else:
+			await message.channel.send('```prolog\nLoop: off```')
+
+	async def cmd_choose(self, message, choice, *args):
+		'''
+		Help u to choose something lmao
+		Don't blame me if something goes wrong :|
+		Command group: Misc
+		Usage: {command_prefix}choose [option 1], [option 2],...
+		Example: ~choose friend, like, love
+		'''
+		choices = [choice]
+
+		if args is not None:
+			text = ' '.join(args)
+			choices.extend(text.split(', '))
+		
+		result = random.choice(choices)
+			
+		await message.channel.send(f'Well, I choose **{result}**!')
+
+	@owner_only
+	async def cmd_config(self, message, key, value, *args):
+		'''
+		Set bot's configuration
+		Command group: Owner only
+		Usage:
+			{command_prefix}config [key] [value]
+		Example:
+			~config active_from 8
+		'''
+		if key not in self.config:
+			await message.channel.send('```fix\nConfig key not found```')
+		else:
+			t = type(self.config[key])
+			try:
+				self.config[key] = t(value)
+			except ValueError:
+				self.config[key] = value
+
+			with open('config/global.yaml', mode='w+') as f:
+				yaml.dump(self.config, f, Dumper=yaml.CSafeDumper)
+			
+		await message.channel.send('```css\nDone. Restarting...```')
+		raise RestartSignal

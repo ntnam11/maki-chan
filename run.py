@@ -5,7 +5,7 @@ import discord
 import asyncio
 import time
 
-from bot.exceptions import ConfigException
+from bot.exceptions import *
 
 async def run():
     try:
@@ -43,9 +43,11 @@ def main():
         try:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(run())
-        except ConfigException:
+        except (ConfigException, SleepException):
             retry = False
             exit()
+        except RestartSignal:
+            pass
 
         gc.collect()
         asyncio.set_event_loop(asyncio.get_event_loop())

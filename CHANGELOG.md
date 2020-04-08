@@ -1,5 +1,15 @@
 # Changelogs
 
+## [0.2.3] - 2020-04-08
+### Added
+- bot sleep time
+#### New Commands
+- loop
+- choose
+### Modified
+- debug
+- llradio & commands check for sleep time
+
 ## [0.2.2] - 2020-04-07
 ### Added
 #### New Commands

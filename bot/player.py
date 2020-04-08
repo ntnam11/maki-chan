@@ -150,7 +150,10 @@ class MusicPlayer:
 
         return {'error': False}
 
-    async def _process_queue(self):
+    async def _process_queue(self):        
+        if self.loop:
+            self.music_queue.insert(0, self.current_song)
+
         if len(self.music_queue) == 0:
             self.current_song = None
             return
@@ -171,5 +174,5 @@ class MusicPlayer:
         try:
             self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue(), self.loop))
         except discord.errors.ClientException:
-            self.voice_client.connect()
+            await self.voice_client.connect()
             self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue(), self.loop))

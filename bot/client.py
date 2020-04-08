@@ -34,6 +34,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.music_queue = []
 		self.current_song = None
 		self.voice_text_channel = None
+		self.loop = False
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
 		pic_cmds = {
 			'cmd_hug': {
@@ -133,7 +134,23 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 
 		os.mkdir(game_cache_songs)
 
+		self.check_sleep()
+
 		return super(MainClient, self).__init__()
+	
+	def check_sleep(self, message=None):
+		h = datetime.datetime.utcnow().hour
+		active_from = int(self.config['active_from'])
+		active_to = int(self.config['active_to'])
+		time_zone = int(self.config['time_zone'])
+		hour = h + time_zone
+		if hour > 24:
+			hour -= 24
+		if hour < active_from and hour > active_to:
+			if message:
+				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
+			print('Sleep time...')
+			raise SleepException
 
 	def check_owner(self, message):
 		if str(message.author.id) == str(self.owner_id):
@@ -198,8 +215,10 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 
 					try:
 						if not has_args:
+							self.check_sleep(message)
 							await cmd(message, None)
 						else:
+							self.check_sleep(message)
 							await cmd(message, *m[len(c) + 1:].split(' '))
 					except Exception as e:
 						try:
@@ -208,28 +227,6 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 						except:
 							pass
 					
-					# if not has_args:
-					# 	try:
-					# 		await cmd(message, None)
-					# 	except TypeError:
-					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
-					# 	except Exception as e:
-					# 		try:
-					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
-					# 			await message.channel.send(errmsg)
-					# 		except:
-					# 			pass
-					# else:
-					# 	try:
-					# 		await cmd(message, *m[len(c) + 1:].split(' '))
-					# 	except TypeError:
-					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
-					# 	except Exception as e:
-					# 		try:
-					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
-					# 			await message.channel.send(errmsg)
-					# 		except:
-					# 			pass
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
 				if len(message.attachments) != 0:
