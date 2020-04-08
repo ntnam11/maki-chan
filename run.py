@@ -27,6 +27,8 @@ async def run():
             raise ConfigException
         except ConfigException:
             raise
+        except TypeError:
+            raise SleepException
         except Exception as e:
             import traceback
             print(e)

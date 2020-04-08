@@ -11,6 +11,7 @@ import shutil
 import traceback
 import os
 import requests
+import yaml
 
 from threading import Timer
 from textwrap import dedent
@@ -298,12 +299,13 @@ class Commands(MusicPlayer, Games):
 		if self.playing_radio:
 			self.force_stop_radio = True
 		if not self.voice_client and not self.voice_channel:
-			await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
+			# await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
 			return
 		if self.voice_client.is_playing():
 			self.voice_client.stop()
 		await self.voice_client.disconnect()
-		await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
+		if message:
+			await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
 		self.voice_channel = None
 		self.voice_client = None
 		self.playing_radio = False
@@ -975,5 +977,7 @@ class Commands(MusicPlayer, Games):
 			with open('config/global.yaml', mode='w+') as f:
 				yaml.dump(self.config, f, Dumper=yaml.CSafeDumper)
 			
-		await message.channel.send('```css\nDone. Restarting...```')
-		raise RestartSignal
+		await message.channel.send('```css\nDone```')
+
+		self.load_config()
+		# raise RestartSignal

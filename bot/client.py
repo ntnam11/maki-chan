@@ -11,6 +11,7 @@ import datetime
 import discord
 
 from .commands import Commands, _pic_func
+from .exceptions import *
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.INFO)
@@ -152,6 +153,8 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		if hour <= active_from and hour >= active_to:
 			if message:
 				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
+			if self.voice_client:
+				asyncio.run_coroutine_threadsafe(self.cmd_leave(message), self.loop)
 			print('Sleep time...')
 			raise SleepException
 
@@ -220,11 +223,14 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 						if not has_args:
 							self.check_sleep(message)
 							if c == 'llradio':
-								await message.channel.send('If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot')
+								await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 							await cmd(message, None)
 						else:
 							self.check_sleep(message)
 							await cmd(message, *m[len(c) + 1:].split(' '))
+					except SleepException:
+						await asyncio.sleep(5)
+						await self.close()
 					except Exception as e:
 						try:
 							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
