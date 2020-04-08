@@ -2,4 +2,6 @@ token: ''
 prefix: ;
 youtube_apikey: ''
 owner_id: 309579216322691073
-autoplaylist: true
+active_from: 7
+active_to: 25
+time_zone: 7
