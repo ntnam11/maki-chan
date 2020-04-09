@@ -1,6 +1,6 @@
 # Changelogs
 
-## [0.2.3] - 2020-04-08
+## [0.2.3] - 2020-04-09
 ### Added
 - bot sleep time
 #### New Commands

@@ -82,11 +82,23 @@ class Games:
 			
 			songs_available.extend(song_urls)
 
+			songs = table.find_all('a', {'class': 'mw-redirect'})
+			song_urls = []
+
+			for song in songs:
+				song_urls.append('https://love-live.fandom.com' + song.attrs['href'])
+			
+			songs_available.extend(song_urls)
+
 		with open(os.path.join('game_cache', 'song_additional')) as f:
 			content = f.readlines()
 
 		for line in content:
-			songs_available.append(line.strip())
+			l = line.strip()
+			if l != '':
+				songs_available.append(l)
+
+		songs_available = list(set(songs_available))
 		
 		with open(os.path.join('game_cache', 'song_list'), mode='w+') as f:
 			f.write('\n'.join(songs_available))
@@ -216,7 +228,8 @@ class Games:
 		struserlist = ""
 		strresult = ""
 		
-		await message.channel.send("Game starts in 5 seconds. Be ready!")
+		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}```\nGame starts in 5 seconds. Be ready!')
+
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
@@ -350,11 +363,11 @@ class Games:
 		shutil.rmtree(dirpath, ignore_errors=True)
 
 		strresult = ""
-		for x in userinfo:
-			strresult += "%s: %s\n" % (x, userinfo[x])
+		sorted_name = [v[0] for v in sorted(userinfo.items(), key=lambda kv: (-kv[1], kv[0]))]
+		for x in sorted_name:
+			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
-		await message.channel.send("Thanks for playing :)))")
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
 
 		self.playing_cardgame = False
 
@@ -364,7 +377,6 @@ class Games:
 		You will get 10 points for the first line, and -2 for each printed line. 5 lines maximum
 		You have 45 seconds to guess the song. Each hint will be printed out with the cost of 2 points
 		If the bot stucks, try {command_prefix}flush to clear its cache
-		Run {command_prefix}songgame update to update the database (for the bot's owner)
 		Command group: Games
 		Usage:
 			{command_prefix}lyricgame round_num [diff]
@@ -384,14 +396,6 @@ class Games:
 			~lyricgame 10 hard
 			~lyricgame 1
 		"""
-		if round_num.lower() == 'update':
-			if self.check_owner(message):
-				self._create_song_list()
-				await message.channel.send('```css\nDatabase updated```')
-			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
-			return
-
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
 		if not os.path.exists(song_list):
@@ -603,11 +607,11 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			time.sleep(1)
 
 		strresult = ""
-		for x in userinfo:
-			strresult += "%s: %s\n" % (x, userinfo[x])
+		sorted_name = [v[0] for v in sorted(userinfo.items(), key=lambda kv: (-kv[1], kv[0]))]
+		for x in sorted_name:
+			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
-		await message.channel.send("Thanks for playing :)))")
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
 
 		self.playing_lyricgame = False
 
@@ -619,7 +623,9 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		You will have 45 seconds to guess what song is that.
 		If the bot stucks, try {command_prefix}flush to clear its cache
 		If you don't hear anything, try leave the voice channel & join again
-		Run {command_prefix}songgame update to update the database (for the bot's owner)
+		For the bot's owner:
+			{command_prefix}songgame update: to update the database
+			{command_prefix}songgame add [url]: to add a song
 		Command group: Games
 		Usage:
 			{command_prefix}songgame round_num [diff]
@@ -649,15 +655,6 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
 			return
 
-		if self.voice_client:
-			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
-
-		if not self.voice_client:
-			r = await self.cmd_join(message)
-			if r['error']:
-				return
-
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
 		if not os.path.exists(song_list):
@@ -666,6 +663,28 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			with open(song_list, mode='r') as f:
 				songs_available = f.readlines()
 				
+		if round_num.lower() == 'add':
+			query = ' '.join(args)
+			if self.check_owner(message):
+				if query not in songs_available:
+					if query.startswith('https://love-live.fandom.com/wiki'):
+						with open(os.path.join('game_cache', 'song_additional'), mode='a+') as f:
+							f.write(query + '\n')
+					else:
+						await message.channel.send('```prolog\nPlease give a wiki link instead :|```')
+				await message.channel.send('```css\nSong added```')
+			else:
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
+			return
+
+		if self.voice_client:
+			if self.voice_client.is_playing():
+				await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
+
+		if not self.voice_client:
+			r = await self.cmd_join(message)
+			if r['error']:
+				return
 		try:
 			if self.playing_songgame:
 				await message.channel.send("The game is currently being played. Enjoy!")
@@ -688,32 +707,9 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return m.channel == message.channel
 
 		if round_num > 50:
-			checktimeout = False
-			checkproceed = False
-			start = int(time.time())
-			await message.channel.send("You really wanna play %s rounds? .-. Hm... Type `y` to proceed in 10 seconds, or `n` to quit" % round_num)
-
-			while True:
-				if (int(time.time() - start) >= 5):
-					checktimeout = True
-				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=10)
-				except asyncio.TimeoutError:
-					checktimeout = True
-				else:
-					if response_message.content == 'y':
-						checktimeout = True
-						checkproceed = True
-					elif response_message.content == 'n':
-						checktimeout = True
-
-				if checktimeout:
-					break
-			
-			if not checkproceed:
-				await message.channel.send("Next time choose a smaller number of rounds :D")
-				self.playing_songgame = False
-				return
+			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number :(```")
+			self.playing_songgame = False
+			return
 		
 		easy_diff = ['easy', 'e']
 		normal_diff = ['normal', 'n']
@@ -749,7 +745,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		struserlist = ""
 		strresult = ""
 		
-		await message.channel.send("Game starts in 5 seconds. Be ready!")
+		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nLength: {duration} seconds```\nGame starts in 5 seconds. Be ready!')
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
@@ -776,11 +772,17 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 
 		stop = False
 
+		cached = []
+
 		for count in range(0, round_num):
 			await message.channel.send(f'Preparing question {count + 1} of {round_num}...')
 			
 			while True:
 				song_url = random.choice(songs_available)
+				if song_url in cached:
+					continue
+				else:
+					cached.append(song_url)
 				r = requests.get(song_url.strip())
 				soup =  BeautifulSoup(r.content, 'html5lib')
 
@@ -918,11 +920,11 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			time.sleep(1)
 
 		strresult = ""
-		for x in userinfo:
-			strresult += "%s: %s\n" % (x, userinfo[x])
+		sorted_name = [v[0] for v in sorted(userinfo.items(), key=lambda kv: (-kv[1], kv[0]))]
+		for x in sorted_name:
+			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send("Final result:\n```prolog\n%s```" % (strresult))
-		await message.channel.send("Thanks for playing :)))")
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
 
 		await self.cmd_leave(message)
 

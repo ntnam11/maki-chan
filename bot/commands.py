@@ -892,9 +892,16 @@ class Commands(MusicPlayer, Games):
 
 		source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), 'game_cache', 'radio.ogg'), executable='ffmpeg')
 
-		md = random.choice(['fix', 'css', 'prolog', 'autohotkey', 'bash', 'coffeescript', 'md', 'ml'])
+		md = random.choice(['fix', 'css', 'prolog', 'autohotkey', 'bash', 'coffeescript', 'md', 'ml', 'cs', 'diff', 'tex'])
 
-		await message.channel.send(f'```{md}\nNow playing: {song_name}```')
+		if md in ['diff']:
+			prefix = '!'
+		elif md in ['tex']:
+			prefix = '$'
+		else:
+			prefix = '#'
+
+		await message.channel.send(f'```{md}\n{prefix} Now playing: {song_name}```')
 
 		self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop))
 
@@ -980,4 +987,3 @@ class Commands(MusicPlayer, Games):
 		await message.channel.send('```css\nDone```')
 
 		self.load_config()
-		# raise RestartSignal
