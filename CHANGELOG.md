@@ -10,6 +10,7 @@
 - status
 ### Modified
 - cardgame: added llsif all stars
+- llradio: added cache system (50 songs)
 
 ## [0.2.3] - 2020-04-09
 ### Added
