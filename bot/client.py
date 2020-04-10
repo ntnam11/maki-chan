@@ -7,6 +7,7 @@ import traceback
 from textwrap import dedent
 from inspect import signature
 import datetime
+import random
 
 import discord
 
@@ -37,6 +38,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.current_song = None
 		self.voice_text_channel = None
 		self.loop = False
+		self.radio_cache = []
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
 		pic_cmds = {
 			'cmd_hug': {
@@ -143,8 +145,10 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 	def check_sleep(self, message=None):
 		h = datetime.datetime.utcnow().hour
 		active_from = int(self.config['active_from'])
-		active_to = int(self.config['active_to'])
 		time_zone = int(self.config['time_zone'])
+		if h >= active_from + time_zone:
+			return
+		active_to = int(self.config['active_to'])
 		hour = h + time_zone
 		if hour > 24:
 			hour -= 24
@@ -237,7 +241,13 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							await message.channel.send(errmsg)
 						except:
 							pass
+					else:
+						if not self.skip_status:
+							game = discord.Game(random.choice(self.statuses))
+							await self.change_presence(activity=game)
 					
+			self.check_sleep()
+
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
 				if len(message.attachments) != 0:

@@ -1,5 +1,4 @@
 import asyncio
-import difflib
 import io
 import logging
 import os
@@ -7,9 +6,11 @@ import random
 import shutil
 import tempfile
 import time
+import urllib.parse
 import urllib.request
 import requests
 import re
+import gc
 
 import subprocess
 
@@ -20,8 +21,6 @@ from PIL import Image
 from bs4 import BeautifulSoup
 
 from .exceptions import *
-
-MAX_SIF_CARDS = 5000
 
 SIF_IDOL_NAMES = {
 	'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
@@ -111,7 +110,8 @@ class Games:
 		If the bot stucks, try {command_prefix}flush to clear its cache
 		Command group: Games
 		Usage:
-			{command_prefix}cardgame card_num [diff] [custom_dimension]
+			{command_prefix}cardgame [as] card_num [diff] [custom_dimension]
+			- as: All-stars
 			- card_num: Number of rounds to play
 			- diff:
 				+ easy/e: image size 300x300
@@ -143,6 +143,18 @@ class Games:
 				return
 		except AttributeError:
 			self.playing_cardgame = True
+
+		all_stars = False
+		if card_num == 'as':
+			all_stars = True
+			if not args:
+				pass
+			else:
+				card_num = args[0]
+				if len(args) == 1:
+					args = None
+				else:
+					args = args[1:]
 
 		diff_size = {
 			'easy': 300,
@@ -228,12 +240,19 @@ class Games:
 		struserlist = ""
 		strresult = ""
 		
-		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}```\nGame starts in 5 seconds. Be ready!')
+		if all_stars:
+			source = 'Love Live! School Idol Festival ALL STARS'
+		else:
+			source = 'Love Live! School Idol Festival'
+		await message.channel.send(f'```prolog\nSource: {source}\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}```\nGame starts in 5 seconds. Be ready!')
 
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
 		logger.info("Game called at %s" % (start))
+
+		game = discord.Game('Card Game with friends')
+		await self.change_presence(activity=game)
 
 		self.playing_cardgame = True
 		
@@ -261,55 +280,89 @@ class Games:
 		
 		x_range = [100, 512 - diff_size[diff]]
 		y_range = [200, 720 - diff_size[diff]]
-		network_timeout = 0
 		stop = False
 		dirpath = tempfile.mkdtemp()
 
 		for count in range(0, card_num):
-			card_max = MAX_SIF_CARDS
+			card_max = self.config['max_sif_cards']
 
 			async with message.channel.typing():
-				while (network_timeout < 5):
+				network_timeout = 0
+				while network_timeout < 5:
 					random_num = random.randint(1, card_max)
-					url = 'http://schoolido.lu/api/cards/%s' % (random_num)
-					logger.info('Searched %s' % (url))
+					url = f'https://schoolido.lu/api/cards/{random_num}'
+					if all_stars:
+						url = 'https://idol.st/allstars/cards/random/'
+					logger.info(f'Searched {url}')
 					async with aiohttp.ClientSession() as session:
 						async with session.get(url) as r:
 							if r.status == 404:
 								card_max = card_max / 2
 								pass
 							elif r.status == 200:
-								js = await r.json()
-								if 'detail' in js:
-									card_max = card_max / 2
-								else:
-									selected_idol = js['idol']['name']
-									if (selected_idol in SIF_IDOL_NAMES.values()):
-										img = 'http:%s' % (js['card_image'])
-										selected_card = js['id']
-										if img == "http:None":
-											img = 'http:%s' % (js['card_idolized_image'])
-										logger.info('Found %s' % (img))
-										break
+								if not all_stars:
+									js = await r.json()
+									if 'detail' in js:
+										card_max = card_max / 2
 									else:
-										pass
+										selected_idol = js['idol']['name']
+										if (selected_idol in SIF_IDOL_NAMES.values()):
+											key = random.choice(['card_image', 'card_idolized_image'])
+											img = f'https:{js[key]}'
+											selected_card = js['id']
+											if img == "http:None" or img == "https:None":
+												img = 'https:%s' % (js['card_idolized_image'])
+											logger.info(f'Found {img}')
+											break
+								else:
+									soup = BeautifulSoup(await r.read(), 'html5lib')
+									path = r.url.path
+									selected_card = re.findall(r'\d+', path)[0]
+									idol = soup.find('tr', {'data-field': 'idol'})
+									selected_idol = idol.find('a', {'class': None}).attrs['data-ajax-title']
+									if selected_idol in SIF_IDOL_NAMES.values():
+										images = soup.find_all('img', {'class': 'allstars-card-image'})
+										image = random.choice(images)
+										img = 'https:' + urllib.parse.quote(f"{image.attrs['src']}")
+										e_rarity = soup.find('tr', {'data-field': 'rarity'}).text
+										rarity = e_rarity.replace('Rarity', '').strip()
+										logger.info(f'Found {img}')
+										break
 							else:
 								logger.info('Network timed out.')
 								network_timeout += 1
-								time.sleep(5)
+								time.sleep(3)
 				
 				if network_timeout == 5:
-					await message.channel.send('```Something wrong with this API. Please contact bot owner```')
+					await message.channel.send('```Something wrong with the API server. Please contact bot owner / try again later```')
 					self.playing_cardgame = False
 					return
 
-				fd = urllib.request.urlopen(img)
-				image_file = io.BytesIO(fd.read())
+				if not all_stars:
+					fd = urllib.request.urlopen(img)
+					image_file = io.BytesIO(fd.read())
+				else:
+					r = requests.get(img)
+					image_file = io.BytesIO(r.content)
 				im = Image.open(image_file)
 				path = "%s/%s.png" % (dirpath, selected_card)
 				im.save(path)
 
 				#Crop image and send
+				if all_stars:
+					zoom = 640 / 1800
+					rarity_x_start = {
+						'rare': 500,
+						'super rare': 0,
+						'ultra rare': 0
+					}
+					rarity_x_end = {
+						'rare': 1300,
+						'super rare': 1800,
+						'ultra rare': 1800
+					}
+					x_range = [int(rarity_x_start[rarity.lower()] * zoom), int(rarity_x_end[rarity.lower()] * zoom - diff_size[diff])]
+					y_range = [0, int(900 * zoom - diff_size[diff])]
 				x = random.randint(*x_range)
 				y = random.randint(*y_range)
 				area = (x, y, x+diff_size[diff], y+diff_size[diff])
@@ -370,6 +423,7 @@ class Games:
 		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
 
 		self.playing_cardgame = False
+		gc.collect()
 
 	async def cmd_lyricgame(self, message, round_num, *args):
 		"""
@@ -478,7 +532,10 @@ class Games:
 		checktimeout = False
 		start = int(time.time())
 		logger.info("Game called at %s" % (start))
-		
+				
+		game = discord.Game('Lyrics Game with friends')
+		await self.change_presence(activity=game)
+
 		while True:
 			if (int(time.time()) - start >= 5):
 				checkstart = True
@@ -615,6 +672,8 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 
 		self.playing_lyricgame = False
 
+		gc.collect()
+
 #
 	async def cmd_songgame(self, message, round_num, *args):
 		"""
@@ -670,9 +729,11 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					if query.startswith('https://love-live.fandom.com/wiki'):
 						with open(os.path.join('game_cache', 'song_additional'), mode='a+') as f:
 							f.write(query + '\n')
+						await message.channel.send('```css\nSong added```')
 					else:
 						await message.channel.send('```prolog\nPlease give a wiki link instead :|```')
-				await message.channel.send('```css\nSong added```')
+				else:
+					await message.channel.send('```prolog\nSong existed```')
 			else:
 				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
 			return
@@ -750,6 +811,9 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		checktimeout = False
 		start = int(time.time())
 		logger.info("Game called at %s" % (start))
+		
+		game = discord.Game('Song Game with friends')
+		await self.change_presence(activity=game)
 		
 		while True:
 			if (int(time.time()) - start >= 5):
@@ -933,4 +997,5 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		shutil.rmtree(song_cache)
 		os.mkdir(os.path.join('game_cache', 'songs'))
 
+		gc.collect()
 #

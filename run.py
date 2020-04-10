@@ -34,7 +34,7 @@ async def run():
             print(e)
             traceback.print_exc()
 
-    except ImportError:
+    except ImportError as e:
         subprocess.run('pip install -r requirements.txt'.split(' '))
         return 0
 

@@ -20,7 +20,7 @@ import discord
 from PIL import Image
 from bs4 import BeautifulSoup
 from .player import MusicPlayer
-from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST, MAX_SIF_CARDS
+from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST
 from .exceptions import *
 from .common import *
 
@@ -122,7 +122,7 @@ class Commands(MusicPlayer, Games):
 		'''
 		Set bot's avatar
 		Command group: Special
-		Usage {command_prefix}setavatar [url/image attachment]
+		Usage: {command_prefix}setavatar [url/image attachment]
 		Example: ~setavatar https://c7.uihere.com/files/736/106/562/maki-nishikino-tsundere-japanese-idol-love-live-sunshine-manga-others.jpg
 		'''
 		if isinstance(url, str):
@@ -141,6 +141,15 @@ class Commands(MusicPlayer, Games):
 			pass
 		await message.channel.send('```uwu new avatar```')
 		print('Set avatar: %s' % (url))
+	
+	async def cmd_avatar(self, message, *args):
+		'''
+		View bot's avatar
+		Command group: Special
+		Usage: {command_prefix}avatar
+		Example: ~avatar
+		'''
+		await message.channel.send(f'Hi! This is my avatar <3\n{self.user.avatar_url}')
 
 	async def cmd_help(self, message, command, *args, **kwargs):
 		'''
@@ -310,6 +319,7 @@ class Commands(MusicPlayer, Games):
 		self.voice_client = None
 		self.playing_radio = False
 		self.force_stop_radio = False
+		self.radio_cache = []
 
 	async def cmd_play(self, message, query, *args):
 		'''
@@ -612,7 +622,7 @@ class Commands(MusicPlayer, Games):
 		if not args:
 			found = False
 			while not found:
-				random_id = random.randint(1, MAX_SIF_CARDS)
+				random_id = random.randint(1, self.max_sif_cards)
 				r = await self.cmd_cardinfo(message, random_id, internal=True)
 				if r:
 					return
@@ -836,6 +846,9 @@ class Commands(MusicPlayer, Games):
 			with open(song_list, mode='r') as f:
 				songs_available = f.readlines()
 		
+		if len(self.radio_cache) >= 50:
+			self.radio_cache = []
+
 		self.playing_radio = True
 
 		if self.force_stop_radio:
@@ -850,6 +863,11 @@ class Commands(MusicPlayer, Games):
 
 		while True:
 			song_url = random.choice(songs_available)
+			if song_url in self.radio_cache:
+				continue
+			else:
+				self.radio_cache.append(song_url)
+
 			r = requests.get(song_url.strip())
 			soup =  BeautifulSoup(r.content, 'html5lib')
 
@@ -890,6 +908,9 @@ class Commands(MusicPlayer, Games):
 		with open(os.path.join('game_cache', 'radio.ogg'), mode='wb+') as f:
 			f.write(song_data)
 
+		game = discord.Game(song_name)
+		await self.change_presence(activity=game)
+
 		source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), 'game_cache', 'radio.ogg'), executable='ffmpeg')
 
 		md = random.choice(['fix', 'css', 'prolog', 'autohotkey', 'bash', 'coffeescript', 'md', 'ml', 'cs', 'diff', 'tex'])
@@ -922,6 +943,7 @@ class Commands(MusicPlayer, Games):
 		await message.channel.send('```css\nDone```')
 
 		self.force_stop_radio = False
+		self.radio_cache = []
 
 	async def cmd_loop(self, message, *args):
 		'''
@@ -952,11 +974,13 @@ class Commands(MusicPlayer, Games):
 		Usage: {command_prefix}choose [option 1], [option 2],...
 		Example: ~choose friend, like, love
 		'''
-		choices = [choice]
 
 		if args is not None:
-			text = ' '.join(args)
-			choices.extend(text.split(', '))
+			text = ' '.join([choice, *args])
+			choices = text.split(', ')
+		else:
+			await message.channel.send(f'```prolog\nOh cmon. Give me some more options :|```')
+			return
 		
 		result = random.choice(choices)
 			
@@ -972,6 +996,13 @@ class Commands(MusicPlayer, Games):
 		Example:
 			~config active_from 8
 		'''
+		if key == 'skip_status':
+			if value in ['true', 'True', 't', 'T', 1, '1']:
+				self.skip_status = True
+			if value in ['false', 'False', 'f', 'F', 0, '0']:
+				self.skip_status = False
+			await message.channel.send(f'```css\nChange status: {self.skip_status}```')
+			return
 		if key not in self.config:
 			await message.channel.send('```fix\nConfig key not found```')
 		else:
@@ -987,3 +1018,69 @@ class Commands(MusicPlayer, Games):
 		await message.channel.send('```css\nDone```')
 
 		self.load_config()
+
+	async def cmd_apistatus(self, message, *args):
+		'''
+		Show server status info
+		Command group: Special
+		Usage:
+			{command_prefix}status
+		Example:
+			~status
+		'''
+		check = {
+			'cardgame': {
+				'url': 'https://schoolido.lu/api/cards/315/',
+				'status': 'Timed out'
+			},
+			'songgame': {
+				'url': 'https://love-live.fandom.com/wiki/Bokutachi_wa_Hitotsu_no_Hikari',
+				'status': 'Timed out'
+			},
+			'cardgame_as': {
+				'url': 'https://idol.st/allstars/cards/random/',
+				'status': 'Timed out'
+			},
+		}
+
+		for k, v in check.items():
+			try:
+				r = requests.get(v['url'])
+			except requests.exceptions.ReadTimeout:
+				pass
+			else:
+				if r.status_code == 200:
+					v['status'] = 'OK'
+				elif r.status_code == 404:
+					v['status'] = 'Not found'
+				elif str(r.status_code).startswith('5'):
+					v['status'] = 'Server Error'
+
+		result = {
+			'Cardgame': check['cardgame']['status'],
+			'Cardgame - All stars': check['cardgame_as']['status'],
+			'Songgame': check['songgame']['status'],
+			'Lyricgame': check['songgame']['status'],
+			'Randomcard': check['cardgame']['status'],
+			'Cardinfo': check['cardgame']['status'],
+			'Idolinfo': check['cardgame']['status'],
+		}
+		
+		strresult = ''
+		for k, v in result.items():
+			strresult += f'- {k}: {v}\n'
+
+		await message.channel.send(f'```prolog\nCurrent status:\n{strresult}```')
+	
+	@owner_only
+	async def cmd_status(self, message, status_text, *args):
+		'''
+		Change bot's status text
+		Command group: Owner only
+		Usage:
+			{command_prefix}status [status_text]
+		Example:
+			~status Singing a song~
+		'''
+		game = discord.Game(' '.join([status_text, *args]))
+		await self.change_presence(activity=game)

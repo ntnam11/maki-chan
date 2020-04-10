@@ -1,5 +1,16 @@
 # Changelogs
 
+## [0.2.4] - 2020-04-10
+### Added
+- bot's status
+#### New Commands
+- avatar
+- config
+- apistatus
+- status
+### Modified
+- cardgame: added llsif all stars
+
 ## [0.2.3] - 2020-04-09
 ### Added
 - bot sleep time
