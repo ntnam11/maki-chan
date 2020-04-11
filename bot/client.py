@@ -37,7 +37,8 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.music_queue = []
 		self.current_song = None
 		self.voice_text_channel = None
-		self.loop = False
+		self.music_loop = False
+		self.force_stop_music = False
 		self.radio_cache = []
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
 		self.last_status_timestamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
@@ -243,11 +244,14 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 						except:
 							pass
 					else:
+						if c == 'status':
+							self.skip_status = True
 						if not self.skip_status:
-							if (datetime.datetime.utcnow() - self.last_status_timestamp).total_seconds() >= 300:
-								game = discord.Game(random.choice(self.statuses))
-								await self.change_presence(activity=game)
-								self.last_status_timestamp = datetime.datetime.utcnow()
+							if not self.playing_radio and self.current_song is None:
+								if (datetime.datetime.utcnow() - self.last_status_timestamp).total_seconds() >= 300:
+									game = discord.Game(random.choice(self.statuses))
+									await self.change_presence(activity=game)
+									self.last_status_timestamp = datetime.datetime.utcnow()
 					
 			try:
 				self.check_sleep()

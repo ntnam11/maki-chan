@@ -150,8 +150,11 @@ class MusicPlayer:
 
         return {'error': False}
 
-    async def _process_queue(self):        
-        if self.loop:
+    async def _process_queue(self):  
+        if self.force_stop_music:
+            return
+
+        if self.music_loop:
             self.music_queue.insert(0, self.current_song)
 
         if len(self.music_queue) == 0:
@@ -164,8 +167,19 @@ class MusicPlayer:
         if self.voice_client.is_playing():
             return
         
-        self.current_song = self.music_queue.pop(0)
+        while True:
+            try:
+                self.current_song = self.music_queue.pop(0)
+                if self.current_song is None:
+                    pass
+                else:
+                    break
+            except IndexError:
+                break
         self.current_song.file_path = os.path.join(self.music_cache_dir, self.current_song.id)
+        
+        game = discord.Game(self.current_song.title)
+        await self.change_presence(activity=game)
         
         source = discord.FFmpegPCMAudio(self.current_song.file_path, executable='ffmpeg')
 

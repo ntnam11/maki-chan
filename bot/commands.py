@@ -307,6 +307,8 @@ class Commands(MusicPlayer, Games):
 		'''
 		if self.playing_radio:
 			self.force_stop_radio = True
+		if self.current_song is not None:
+			self.force_stop_music = True
 		if not self.voice_client and not self.voice_channel:
 			# await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
 			return
@@ -320,6 +322,7 @@ class Commands(MusicPlayer, Games):
 		self.playing_radio = False
 		self.force_stop_radio = False
 		self.radio_cache = []
+		self.force_stop_music = False
 
 	async def cmd_play(self, message, query, *args):
 		'''
@@ -451,8 +454,11 @@ class Commands(MusicPlayer, Games):
 			return
 		if self.current_song:
 			self.voice_client.stop()
-			await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
-			await self._process_queue()
+			if not self.music_loop:
+				await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
+				await self._process_queue()
+			else:
+				await message.channe.send('```fix\nWell, you may need to turn off looping before skipping```')
 		else:
 			await message.channel.send('```fix\nNothing to skip at the moment```')
 
@@ -516,7 +522,8 @@ class Commands(MusicPlayer, Games):
 		self.current_song = None
 		self.voice_text_channel = None
 		self.force_stop_radio = False
-		self.loop = False
+		self.force_stop_music = False
+		self.music_loop = False
 
 		await message.channel.send('```css\nDone```')
 		
@@ -750,7 +757,7 @@ class Commands(MusicPlayer, Games):
 		await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)
 
 	# @owner_only
-	async def cmd_debug(self, message, *args):
+	async def cmd_debug(self, message, command, *args):
 		'''
 		Debug mode (For experts only)
 		Command group: Special
@@ -759,7 +766,7 @@ class Commands(MusicPlayer, Games):
 		Example:
 			~debug self
 		'''
-		command = ' '.join(args)
+		command = ' '.join([command, *args])
 		forbidden = ['import', 'del', 'os', 'shutil', 'sys', 'open', 'eval', 'exec']
 		for f in forbidden:
 			if command.startswith(f):
@@ -935,6 +942,9 @@ class Commands(MusicPlayer, Games):
 		'''
 		if self.playing_radio:
 			self.force_stop_radio = True
+		
+		if self.current_song is not None:
+			self.force_stop_music = True
 
 		if self.voice_client:
 			if self.voice_client.is_playing():
@@ -944,6 +954,9 @@ class Commands(MusicPlayer, Games):
 
 		self.force_stop_radio = False
 		self.radio_cache = []
+		self.music_queue = []
+		self.music_loop = False
+		self.force_stop_music = False
 
 	async def cmd_loop(self, message, *args):
 		'''
@@ -959,9 +972,9 @@ class Commands(MusicPlayer, Games):
 		if not self.voice_client:
 			await message.channel.send('```fix\nNothing to loop at the moment```')
 
-		self.loop = not self.loop
+		self.music_loop = not self.music_loop
 
-		if self.loop:
+		if self.music_loop:
 			await message.channel.send('```prolog\nLoop: on```')
 		else:
 			await message.channel.send('```prolog\nLoop: off```')
