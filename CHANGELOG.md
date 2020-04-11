@@ -1,5 +1,49 @@
 # Changelogs
 
+## [0.2.4] - 2020-04-10
+### Added
+- bot's status
+#### New Commands
+- avatar
+- config
+- apistatus
+- status
+### Modified
+- cardgame: added llsif all stars
+- llradio: added cache system (50 songs)
+
+## [0.2.3] - 2020-04-09
+### Added
+- bot sleep time
+#### New Commands
+- loop
+- choose
+### Modified
+- debug
+- llradio & commands check for sleep time
+
+## [0.2.2] - 2020-04-07
+### Added
+#### New Commands
+- llradio
+- stop
+### Bug fixed
+- songgame plays radio drama
+- play, search & all music related commands
+
+## [0.2.1] - 2020-04-05
+### Added
+#### New Commands
+- listserver
+- leaveserver
+- songgame
+- lyricgame
+### Modified
+- rename songgame to lyricgame
+### Bug fixed
+- randomcard doesn't return expected result with capitalized query
+- fixed cat command
+
 ## [0.2.0] - 2020-02-22
 ### Added
 #### New Commands

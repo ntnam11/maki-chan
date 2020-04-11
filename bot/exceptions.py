@@ -6,3 +6,9 @@ class PermissionException(Exception):
 
 class ConfigException(Exception):
     pass
+
+class SleepException(Exception):
+    pass
+
+class RestartSignal(Exception):
+    pass

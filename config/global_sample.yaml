@@ -2,4 +2,79 @@ token: ''
 prefix: ;
 youtube_apikey: ''
 owner_id: 309579216322691073
-autoplaylist: true
+active_from: 7
+active_to: 25
+time_zone: 7
+max_sif_cards: 5000
+skip_status: False
+statuses:
+    - with Nico-chan
+    - with Nico-chan <3
+    - Aishiteru Banzai!! <3
+    - <3 Aishiteru Banzai!!
+    - with Kotori-chan
+    - with Umi-chan
+    - with Honoka-chan
+    - with Eli-chan
+    - with Nozomi-chan
+    - with Hanayo-chan
+    - with Rin-chan
+    - with You-chan
+    - with Chika-chan
+    - with Riko-chan
+    - piano with Riko-chan
+    - with Yoshiko-chan
+    - with Hanamaru-chan
+    - with Ruby-chan
+    - with Dia-chan
+    - with Kanan-chan
+    - with Mari-chan
+    - with Hatsune Miku
+    - with Kaguya-sama
+    - with Naruto
+    - with Sasuke
+    - with Conan-kun
+    - with Kirito
+    - with Asuna
+    - with Chocola & Vanilla
+    - Osu!
+    - PlayerUnknown's Battlegrounds
+    - Apex Legends
+    - Piano
+    - 'Resident Evil 7: Biohazard'
+    - Outlast
+    - 'Counter strike: Global Offensive'
+    - Dota 2
+    - DOOM
+    - Red Dead Redemption
+    - GTA V
+    - 'Sekiro: Shadow Dies Twice'
+    - 'Call of Duty: Modern Warfare'
+    - 'Call of Duty: Warzone'
+    - Assassin's Creed
+    - Half-Life 3
+    - 'Half-Life: Alyx'
+    - Death Stranding
+    - Dark Souls III
+    - 'The Witcher III: Wild Hunt'
+    - Warframe
+    - Nintendo Switch
+    - PS4
+    - Love Live! School Idol Festival
+    - Love Live! School Idol Festival ALL STARS
+    - 'NieR: Automata'
+    - 'Sword Art Online: Fatal Bullet'
+    - Minecraft
+    - 'Animal Crossing: New Horizons'
+    - FIFA 20
+    - Final Fantasy VII Remake
+    - Final Fantasy XV
+    - Final Fantasy XIII
+    - Final Fantasy XIII-2
+    - Final Fantasy X
+    - The Last of Us
+    - The Last of Us Part II
+    - Ori and the Will of the Wisps
+    - Tom Clancy's Rainbow Six Siege
+    - Devil May Cry 5
+    - Monster Hunter World

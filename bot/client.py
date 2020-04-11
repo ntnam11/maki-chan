@@ -6,10 +6,13 @@ import shutil
 import traceback
 from textwrap import dedent
 from inspect import signature
+import datetime
+import random
 
 import discord
 
 from .commands import Commands, _pic_func
+from .exceptions import *
 
 logger = logging.getLogger('discord')
 logger.setLevel(logging.INFO)
@@ -25,13 +28,20 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 			setattr(self, attr, self.config[attr])
 		
 		self.playing_cardgame = False
+		self.playing_lyricgame = False
+		self.playing_songgame = False
+		self.playing_radio = False
+		self.force_stop_radio = False
 		self.voice_client = None
 		self.voice_channel = None
 		self.music_queue = []
 		self.current_song = None
 		self.voice_text_channel = None
+		self.music_loop = False
+		self.force_stop_music = False
+		self.radio_cache = []
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
-
+		self.last_status_timestamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
 		pic_cmds = {
 			'cmd_hug': {
 				'type': 'hug',
@@ -124,7 +134,40 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 
 		os.mkdir('audio_cache')
 
+		game_cache_songs = os.path.join('game_cache', 'songs')
+		if os.path.exists(game_cache_songs):
+			shutil.rmtree(game_cache_songs)
+
+		os.mkdir(game_cache_songs)
+
+		self.check_sleep()
+
 		return super(MainClient, self).__init__()
+	
+	def check_sleep(self, message=None):
+		h = datetime.datetime.utcnow().hour
+		active_from = int(self.config['active_from'])
+		time_zone = int(self.config['time_zone'])
+		active_to = int(self.config['active_to'])
+		hour = h + time_zone
+		if hour > 24:
+			hour -= 24
+		if active_to > 24:
+			active_to -= 24
+		if hour >= active_from + time_zone:
+			return
+		if hour <= active_from and hour >= active_to:
+			if message:
+				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
+			if self.voice_client:
+				asyncio.run_coroutine_threadsafe(self.cmd_leave(message), self.loop)
+			print('Sleep time...')
+			raise SleepException
+
+	def check_owner(self, message):
+		if str(message.author.id) == str(self.owner_id):
+			return True
+		return False
 
 	def load_config(self):
 		try:
@@ -154,7 +197,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 	async def on_message(self, message):
 		if not message.author.bot:
 			if message.content.startswith(self.prefix):
-				print('Message from {0.author}: {0.content}'.format(message))
+				print('Message in {0.guild} #{0.channel} from {0.author}: {0.content}'.format(message))
 				m = message.content[1:]
 				c = m.split(' ')[0]
 
@@ -176,45 +219,45 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							required_count += 1
 
 					if required_count > actual_params:
-						doc = '```prolog\n{0}```'.format(dedent(cmd.__doc__))
-						doc = doc.replace('{command_prefix}', self.prefix)
-						await message.channel.send(doc)
-						return
+						if c != 'help':
+							doc = '```prolog\n{0}```'.format(dedent(cmd.__doc__))
+							doc = doc.replace('{command_prefix}', self.prefix)
+							await message.channel.send(doc)
+							return
 
 					try:
 						if not has_args:
+							self.check_sleep(message)
+							if c == 'llradio':
+								await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 							await cmd(message, None)
 						else:
+							self.check_sleep(message)
 							await cmd(message, *m[len(c) + 1:].split(' '))
+					except SleepException:
+						await asyncio.sleep(5)
+						await self.close()
 					except Exception as e:
 						try:
 							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
 							await message.channel.send(errmsg)
 						except:
 							pass
+					else:
+						if c == 'status':
+							self.skip_status = True
+						if not self.skip_status:
+							if not self.playing_radio and self.current_song is None:
+								if (datetime.datetime.utcnow() - self.last_status_timestamp).total_seconds() >= 300:
+									game = discord.Game(random.choice(self.statuses))
+									await self.change_presence(activity=game)
+									self.last_status_timestamp = datetime.datetime.utcnow()
 					
-					# if not has_args:
-					# 	try:
-					# 		await cmd(message, None)
-					# 	except TypeError:
-					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
-					# 	except Exception as e:
-					# 		try:
-					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
-					# 			await message.channel.send(errmsg)
-					# 		except:
-					# 			pass
-					# else:
-					# 	try:
-					# 		await cmd(message, *m[len(c) + 1:].split(' '))
-					# 	except TypeError:
-					# 		await message.channel.send('```prolog\n{0}```'.format(dedent(cmd.__doc__)))
-					# 	except Exception as e:
-					# 		try:
-					# 			errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
-					# 			await message.channel.send(errmsg)
-					# 		except:
-					# 			pass
+			try:
+				self.check_sleep()
+			except SleepException:
+				await self.close()
+
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
 				if len(message.attachments) != 0:

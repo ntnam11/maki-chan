@@ -5,7 +5,7 @@ import discord
 import asyncio
 import time
 
-from bot.exceptions import ConfigException
+from bot.exceptions import *
 
 async def run():
     try:
@@ -27,13 +27,15 @@ async def run():
             raise ConfigException
         except ConfigException:
             raise
+        except TypeError:
+            raise SleepException
         except Exception as e:
             import traceback
             print(e)
             traceback.print_exc()
 
-    except ImportError:
-        subprocess.call('pip install requirements.txt')
+    except ImportError as e:
+        subprocess.run('pip install -r requirements.txt'.split(' '))
         return 0
 
 def main():
@@ -43,9 +45,11 @@ def main():
         try:
             loop = asyncio.get_event_loop()
             loop.run_until_complete(run())
-        except ConfigException:
+        except (ConfigException, SleepException):
             retry = False
             exit()
+        except RestartSignal:
+            pass
 
         gc.collect()
         asyncio.set_event_loop(asyncio.get_event_loop())
