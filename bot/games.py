@@ -65,23 +65,15 @@ class Games:
 		pass
 
 	def _create_song_list(self):
-		resource_url = 'https://love-live.fandom.com/wiki/Song_Centers'
+		resource_url = 'https://love-live.fandom.com/wiki/Songs_BPM_List'
 		r = requests.get(resource_url)
 
 		soup = BeautifulSoup(r.content, 'html5lib')
 		
-		tables = soup.find_all('table', {'class': 'article-table'})		
+		tables = soup.find_all('table', {'class': 'wikitable'})		
 		songs_available = []
 		for table in tables:
-			songs = table.find_all('a', {'class': None})
-			song_urls = []
-
-			for song in songs:
-				song_urls.append('https://love-live.fandom.com' + song.attrs['href'])
-			
-			songs_available.extend(song_urls)
-
-			songs = table.find_all('a', {'class': 'mw-redirect'})
+			songs = table.find_all('a')
 			song_urls = []
 
 			for song in songs:
@@ -244,7 +236,7 @@ class Games:
 			source = 'Love Live! School Idol Festival ALL STARS'
 		else:
 			source = 'Love Live! School Idol Festival'
-		await message.channel.send(f'```prolog\nSource: {source}\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}```\nGame starts in 5 seconds. Be ready!')
+		await message.channel.send(f'```prolog\nSource: {source}\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}\nNumber of rounds: {card_num}```\nGame starts in 5 seconds. Be ready!')
 
 		checkstart = False
 		checktimeout = False
@@ -430,6 +422,7 @@ class Games:
 		Play Love Live!! lyric guessing game
 		You will get 10 points for the first line, and -2 for each printed line. 5 lines maximum
 		You have 45 seconds to guess the song. Each hint will be printed out with the cost of 2 points
+		For special character (star, arrow, heart,...), you can use a dot "." instead
 		If the bot stucks, try {command_prefix}flush to clear its cache
 		Command group: Games
 		Usage:
@@ -527,7 +520,7 @@ class Games:
 		struserlist = ""
 		strresult = ""
 		
-		await message.channel.send("Game starts in 5 seconds. Be ready!")
+		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nNumber of rounds: {round_num}```\nGame starts in 5 seconds. Be ready!')
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
@@ -682,6 +675,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		You will have 45 seconds to guess what song is that.
 		If the bot stucks, try {command_prefix}flush to clear its cache
 		If you don't hear anything, try leave the voice channel & join again
+		For special character (star, arrow, heart,...), you can use a dot "." instead
 		For the bot's owner:
 			{command_prefix}songgame update: to update the database
 			{command_prefix}songgame add [url]: to add a song
@@ -806,7 +800,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		struserlist = ""
 		strresult = ""
 		
-		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nLength: {duration} seconds```\nGame starts in 5 seconds. Be ready!')
+		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nLength: {duration} seconds\nNumber of rounds: {round_num}```\nGame starts in 5 seconds. Be ready!')
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())

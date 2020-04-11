@@ -847,7 +847,7 @@ class Commands(MusicPlayer, Games):
 				songs_available = f.readlines()
 		
 		if len(self.radio_cache) >= 50:
-			self.radio_cache = []
+			self.radio_cache.pop(0)
 
 		self.playing_radio = True
 
@@ -1001,7 +1001,7 @@ class Commands(MusicPlayer, Games):
 				self.skip_status = True
 			if value in ['false', 'False', 'f', 'F', 0, '0']:
 				self.skip_status = False
-			await message.channel.send(f'```css\nChange status: {self.skip_status}```')
+			await message.channel.send(f'```css\nSkip changing status: {self.skip_status}```')
 			return
 		if key not in self.config:
 			await message.channel.send('```fix\nConfig key not found```')

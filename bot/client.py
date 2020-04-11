@@ -40,6 +40,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.loop = False
 		self.radio_cache = []
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
+		self.last_status_timestamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
 		pic_cmds = {
 			'cmd_hug': {
 				'type': 'hug',
@@ -195,7 +196,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 	async def on_message(self, message):
 		if not message.author.bot:
 			if message.content.startswith(self.prefix):
-				print('Message from {0.author}: {0.content}'.format(message))
+				print('Message in {0.guild} #{0.channel} from {0.author}: {0.content}'.format(message))
 				m = message.content[1:]
 				c = m.split(' ')[0]
 
@@ -243,10 +244,15 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							pass
 					else:
 						if not self.skip_status:
-							game = discord.Game(random.choice(self.statuses))
-							await self.change_presence(activity=game)
+							if (datetime.datetime.utcnow() - self.last_status_timestamp).total_seconds() >= 300:
+								game = discord.Game(random.choice(self.statuses))
+								await self.change_presence(activity=game)
+								self.last_status_timestamp = datetime.datetime.utcnow()
 					
-			self.check_sleep()
+			try:
+				self.check_sleep()
+			except SleepException:
+				await self.close()
 
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
