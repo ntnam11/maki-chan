@@ -4,3 +4,5 @@ global.yaml
 audio_cache
 ffmpeg.exe
 *.ogg
+game_cache/scout/*.png
+scout.jpg

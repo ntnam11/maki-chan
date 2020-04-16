@@ -14,7 +14,7 @@ import discord
 from .commands import Commands, _pic_func
 from .exceptions import *
 
-logger = logging.getLogger('discord')
+logger = logging.getLogger('root.client')
 logger.setLevel(logging.INFO)
 handler = logging.FileHandler(filename='discord.log', encoding='utf-8', mode='w')
 handler.setFormatter(logging.Formatter('%(asctime)s [%(levelname)s] [%(name)s]: %(message)s'))
@@ -40,6 +40,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.music_loop = False
 		self.force_stop_music = False
 		self.radio_cache = []
+		self.scouting = False
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
 		self.last_status_timestamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
 		pic_cmds = {
@@ -138,7 +139,12 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		if os.path.exists(game_cache_songs):
 			shutil.rmtree(game_cache_songs)
 
+		game_cache_scout = os.path.join('game_cache', 'scout')
+		if os.path.exists(game_cache_scout):
+			shutil.rmtree(game_cache_scout)
+
 		os.mkdir(game_cache_songs)
+		os.mkdir(game_cache_scout)
 
 		self.check_sleep()
 
@@ -188,16 +194,16 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 			self.owner_id = os.environ['OWNER_ID']
 
 	def on_ready(self):
-		print('Logged on as %s' % (self.user))
-		print('Set Prefix: %s' % self.prefix)
-		print('Connected to:')
+		logger.info('Logged on as %s' % (self.user))
+		logger.info('Set Prefix: %s' % self.prefix)
+		logger.info('Connected to:')
 		for guild in self.guilds:
-			print(' - {0.name} ({0.id})'.format(guild))
+			logger.info(' - {0.name} ({0.id})'.format(guild))
 
 	async def on_message(self, message):
 		if not message.author.bot:
 			if message.content.startswith(self.prefix):
-				print('Message in {0.guild} #{0.channel} from {0.author}: {0.content}'.format(message))
+				logger.info('{0.guild} #{0.channel} - {0.author}: {0.content}'.format(message))
 				m = message.content[1:]
 				c = m.split(' ')[0]
 
@@ -227,19 +233,19 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 
 					try:
 						if not has_args:
-							self.check_sleep(message)
-							if c == 'llradio':
-								await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
+							# if c == 'llradio':
+								# await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 							await cmd(message, None)
-						else:
 							self.check_sleep(message)
+						else:
 							await cmd(message, *m[len(c) + 1:].split(' '))
+							self.check_sleep(message)
 					except SleepException:
 						await asyncio.sleep(5)
 						await self.close()
 					except Exception as e:
 						try:
-							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls :(" % (repr(e), traceback.format_exc())
+							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls (*´д｀*)" % (repr(e), traceback.format_exc().replace('```', '\```'))
 							await message.channel.send(errmsg)
 						except:
 							pass
@@ -252,9 +258,10 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 									game = discord.Game(random.choice(self.statuses))
 									await self.change_presence(activity=game)
 									self.last_status_timestamp = datetime.datetime.utcnow()
-					
+
 			try:
-				self.check_sleep()
+				if not self.playing_radio:
+					self.check_sleep()
 			except SleepException:
 				await self.close()
 

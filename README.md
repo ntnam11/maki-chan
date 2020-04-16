@@ -1,6 +1,6 @@
 # Maki-chan Discord bot
 
-Just another Discord bot in Python :D
+Just another Discord bot in Python (´･ω･`)
 
 [![CircleCI](https://circleci.com/gh/ntnam11/maki-chan/tree/master.svg?style=svg)](https://circleci.com/gh/ntnam11/maki-chan/tree/master)
 

@@ -11,7 +11,6 @@ import urllib.request
 import requests
 import re
 import gc
-
 import subprocess
 
 import aiohttp
@@ -20,28 +19,8 @@ import yaml
 from PIL import Image
 from bs4 import BeautifulSoup
 
+from .common import *
 from .exceptions import *
-
-SIF_IDOL_NAMES = {
-	'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
-	'honoka': 'Kousaka Honoka', 'kotori': 'Minami Kotori', 'maki': 'Nishikino Maki', 'nozomi': 'Toujou Nozomi', 'nico': 'Yazawa Nico',
-	'chika': 'Takami Chika', 'riko': 'Sakurauchi Riko', 'you': 'Watanabe You', 'yoshiko': 'Tsushima Yoshiko', 'yohane': 'Tsushima Yoshiko',
-	'ruby': 'Kurosawa Ruby', 'hanamaru': 'Kunikida Hanamaru', 'mari': 'Ohara Mari', 'dia': 'Kurosawa Dia', 'kanan': 'Matsuura Kanan',
-	'alpaca': 'Alpaca', 'shiitake': 'Shiitake', 'uchicchi': 'Uchicchi',
-	"chika's mother": "Chika's mother", "honoka's mother": "Honoka's mother", "kotori's mother": "Kotori's mother", "maki's mother": "Maki's mother", "nico's mother": "Nico's mother",
-	'cocoa': 'Yazawa Cocoa', 'cocoro': 'Yazawa Cocoro', 'cotarou': 'Yazawa Cotarou',
-	'ayumu': 'Uehara Ayumu', 'setsuna': 'Yuki Setsuna', 'shizuku': 'Osaka Shizuku',
-	'karin': 'Asaka Karin', 'kasumi': 'Nakasu Kasumi', 'ai': 'Miyashita Ai',
-	'rina': 'Tennoji Rina', 'kanata': 'Konoe Kanata', 'emma': 'Emma Verde',
-}
-SIF_NAME_LIST = [
-	'eli', 'rin', 'hanayo', 'honoka', 'kotori', 'maki', 'umi', 'nozomi', 'nico',
-	'chika', 'riko', 'you', 'yoshiko', 'ruby', 'hanamaru', 'mari', 'dia', 'kanan', 'yohane',
-	'alpaca', 'shiitake', 'uchicchi',
-	"chika's mother", "honoka's mother", "kotori's mother", "maki's mother", "nico's mother",
-	'cocoa', 'cocoro', 'cotarou',
-	'ayumu', 'ai', 'setsuna', 'kanata', 'karin', 'emma', 'rina', 'shizuku', 'kasumi',
-]
 
 logger = logging.getLogger('Games')
 
@@ -114,20 +93,20 @@ class Games:
 			- custom_dimension: an integer between 10 - 400
 			Normal diff by default
 
-			stop to stop the game (for who called the game :D)
+			stop to stop the game (for who called the game (´･ω･`))
 
-			Just type the answer without prefix :D
+			Just type the answer without prefix (´･ω･`)
 			
 			Idol names including: 
-				maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
-				ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
+				maki, rin, hanayo, hana, kotori, birb, honoka, honk, umi, eli, nozomi, nico,
+				ruby, hanamaru, maru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
 				ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi,
 				and some support characters
 
-			You must answer in 15 seconds :D
+			You must answer in 15 seconds (´･ω･`)
 		Example:
-			~cardgame 10 ex
-			~cardgame 1
+			{command_prefix}cardgame 10 ex
+			{command_prefix}cardgame 1
 		"""
 		try:
 			if self.playing_cardgame:
@@ -194,7 +173,7 @@ class Games:
 					break
 			
 			if not checkproceed:
-				await message.channel.send("Next time choose a smaller number of rounds :D")
+				await message.channel.send("Next time choose a smaller number of rounds (´･ω･`)")
 				self.playing_cardgame = False
 				return
 
@@ -241,7 +220,7 @@ class Games:
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
-		logger.info("Game called at %s" % (start))
+		logger.debug("Game called at %s" % (start))
 
 		game = discord.Game('Card Game with friends')
 		await self.change_presence(activity=game)
@@ -257,18 +236,15 @@ class Games:
 				checkstart = True
 			else:
 				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me :D")
+					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
 					self.playing_cardgame = False
 					return
 			
 			if (checkstart == True):
-				logger.info("Game starts at %s" % int(time.time()))
+				logger.debug("Game starts at %s" % int(time.time()))
 				await message.channel.send("Music start!")
 				time.sleep(1)
 				break
-
-		# posx = [100, 125, 150, 175, 200, 225, 250, 275, 300]
-		# posy = [200, 225, 250, 275, 300, 325, 350, 350, 375, 400, 425, 450, 475, 500, 525, 550]
 		
 		x_range = [100, 512 - diff_size[diff]]
 		y_range = [200, 720 - diff_size[diff]]
@@ -285,7 +261,7 @@ class Games:
 					url = f'https://schoolido.lu/api/cards/{random_num}'
 					if all_stars:
 						url = 'https://idol.st/allstars/cards/random/'
-					logger.info(f'Searched {url}')
+					logger.debug(f'Searched {url}')
 					async with aiohttp.ClientSession() as session:
 						async with session.get(url) as r:
 							if r.status == 404:
@@ -304,7 +280,7 @@ class Games:
 											selected_card = js['id']
 											if img == "http:None" or img == "https:None":
 												img = 'https:%s' % (js['card_idolized_image'])
-											logger.info(f'Found {img}')
+											logger.debug(f'Found {img}')
 											break
 								else:
 									soup = BeautifulSoup(await r.read(), 'html5lib')
@@ -318,10 +294,10 @@ class Games:
 										img = 'https:' + urllib.parse.quote(f"{image.attrs['src']}")
 										e_rarity = soup.find('tr', {'data-field': 'rarity'}).text
 										rarity = e_rarity.replace('Rarity', '').strip()
-										logger.info(f'Found {img}')
+										logger.debug(f'Found {img}')
 										break
 							else:
-								logger.info('Network timed out.')
+								logger.warning('Network timed out.')
 								network_timeout += 1
 								time.sleep(3)
 				
@@ -366,7 +342,7 @@ class Games:
 				await message.channel.send("Question %d of %d. Guess who?" % (count + 1, card_num), file=discord.File(temp_path))
 
 			start = int(time.time())
-			logger.info("Question %d at %s" % (count + 1, int(time.time())))
+			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
 			strresult = ""
 			while True:
 				if (int(time.time()) - start) >= 15:
@@ -376,7 +352,7 @@ class Games:
 				except asyncio.TimeoutError:
 					response_message = None
 				if (checktimeout == True) or (not response_message):
-					logger.info("Time out.")
+					logger.debug("Time out.")
 					checktimeout = False
 					await message.channel.send("Time out! Here's the answer:\n%s, Card No.%s" % (selected_idol, selected_card), file=discord.File(path))
 					break
@@ -436,12 +412,12 @@ class Games:
 			"hint" to show a hint, including
 				"hint letter": -2 points
 				"hint word": -3 points
-			"stop" to stop the game (for who called the game :D)
+			"stop" to stop the game (for who called the game (´･ω･`))
 
-			Just type the answer without prefix :D
+			Just type the answer without prefix (´･ω･`)
 		Example:
-			~lyricgame 10 hard
-			~lyricgame 1
+			{command_prefix}lyricgame 10 hard
+			{command_prefix}lyricgame 1
 		"""
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
@@ -496,7 +472,7 @@ class Games:
 					break
 			
 			if not checkproceed:
-				await message.channel.send("Next time choose a smaller number of rounds :D")
+				await message.channel.send("Next time choose a smaller number of rounds (´･ω･`)")
 				self.playing_lyricgame = False
 				return
 
@@ -524,7 +500,7 @@ class Games:
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
-		logger.info("Game called at %s" % (start))
+		logger.debug("Game called at %s" % (start))
 				
 		game = discord.Game('Lyrics Game with friends')
 		await self.change_presence(activity=game)
@@ -538,12 +514,12 @@ class Games:
 				checkstart = True
 			else:
 				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me :D")
+					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
 					self.playing_lyricgame = False
 					return
 			
 			if (checkstart == True):
-				logger.info("Game starts at %s" % int(time.time()))
+				logger.debug("Game starts at %s" % int(time.time()))
 				await message.channel.send("Music start!")
 				time.sleep(1)
 				break
@@ -553,7 +529,7 @@ class Games:
 		for count in range(0, round_num):
 			async with message.channel.typing():
 				song_url = random.choice(songs_available)
-				r = requests.get(song_url)
+				r = requests.get(song_url.strip())
 				soup =  BeautifulSoup(r.content, 'html5lib')
 
 				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
@@ -571,7 +547,7 @@ class Games:
 				await message.channel.send("Question %d of %d:" % (count + 1, round_num))
 
 			start = int(time.time())
-			logger.info("Question %d at %s" % (count + 1, int(time.time())))
+			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
 			strresult = ""
 			points = 12
 			lines = iter(lines[start_line:start_line + 5])
@@ -593,7 +569,7 @@ class Games:
 					continue
 				
 				if (checktimeout == True):
-					logger.info("Time out.")
+					logger.debug("Time out.")
 					checktimeout = False
 					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
 					break
@@ -693,19 +669,19 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			"hint" to show a hint, including
 				"hint letter": -2 points
 				"hint word": -3 points
-			"stop" to stop the game (for who called the game :D)
+			"stop" to stop the game (for who called the game (´･ω･`))
 
-			Just type the answer without prefix :D
+			Just type the answer without prefix (´･ω･`)
 		Example:
-			~songgame 10 hard
-			~songgame 1
+			{command_prefix}songgame 10 hard
+			{command_prefix}songgame 1
 		"""
 		if round_num.lower() == 'update':
 			if self.check_owner(message):
 				self._create_song_list()
 				await message.channel.send('```css\nDatabase updated```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
 			return
 
 		song_cache = os.path.join('game_cache', 'songs')
@@ -725,16 +701,16 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 							f.write(query + '\n')
 						await message.channel.send('```css\nSong added```')
 					else:
-						await message.channel.send('```prolog\nPlease give a wiki link instead :|```')
+						await message.channel.send('```prolog\nPlease give a wiki link instead ┐(‘～`；)┌```')
 				else:
 					await message.channel.send('```prolog\nSong existed```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that :(```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
 			return
 
 		if self.voice_client:
 			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nI\'m busy playing some music now :(```')
+				await message.channel.send('```prolog\nI\'m busy playing some music now (*´д｀*)```')
 
 		if not self.voice_client:
 			r = await self.cmd_join(message)
@@ -762,7 +738,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return m.channel == message.channel
 
 		if round_num > 50:
-			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number :(```")
+			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (*´д｀*)```")
 			self.playing_songgame = False
 			return
 		
@@ -804,7 +780,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		checkstart = False
 		checktimeout = False
 		start = int(time.time())
-		logger.info("Game called at %s" % (start))
+		logger.debug("Game called at %s" % (start))
 		
 		game = discord.Game('Song Game with friends')
 		await self.change_presence(activity=game)
@@ -818,12 +794,12 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				checkstart = True
 			else:
 				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me :D")
+					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
 					self.playing_songgame = False
 					return
 			
 			if (checkstart == True):
-				logger.info("Game starts at %s" % int(time.time()))
+				logger.debug("Game starts at %s" % int(time.time()))
 				await message.channel.send("Music start!")
 				time.sleep(1)
 				break
@@ -896,7 +872,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			self.voice_client.play(source)
 			
 			start = int(time.time())
-			logger.info("Question %d at %s" % (count + 1, int(time.time())))
+			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
 			strresult = ""
 			points = 10
 			hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
@@ -911,7 +887,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					checktimeout = True
 				
 				if (checktimeout == True):
-					logger.info("Time out.")
+					logger.debug("Time out.")
 					checktimeout = False
 					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
 					break
@@ -993,3 +969,215 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 
 		gc.collect()
 #
+	
+	async def cmd_scout(self, message, *args):
+		"""
+		Test your luck with scouting
+		Command group: Games
+		Usage:
+			{command_prefix}scout [bt|bt10|bt25] [idol_name|muse|aqours] [1|11]
+				+ {command_prefix}scout for scouting muse 11
+				+ {command_prefix}scout bt [idol_name|muse|aqours] [idlz] for Blue Ticket use (default is scout bt muse)
+				+ {command_prefix}scout idol_name|muse|aqours [1|11] [idlz] for gem use (default if scout 11)
+		Example:
+			{command_prefix}scout bt
+			{command_prefix}scout kotori
+			{command_prefix}scout kotori 11
+		"""
+
+		#Init variables
+		idol_name = {'eli': 'Ayase Eli', 'rin': 'Hoshizora Rin', 'umi': 'Sonoda Umi', 'hanayo': 'Koizumi Hanayo',
+		'honoka': 'Kousaka Honoka', 'kotori': 'Minami Kotori', 'maki': 'Nishikino Maki', 'nozomi': 'Toujou Nozomi', 'nico': 'Yazawa Nico',
+		'chika': 'Takami Chika', 'riko': 'Sakurauchi Riko', 'you': 'Watanabe You', 'yoshiko': 'Tsushima Yoshiko',
+		'ruby': 'Kurosawa Ruby', 'hanamaru': 'Kunikida Hanamaru', 'mari': 'Ohara Mari', 'dia': 'Kurosawa Dia', 'kanan': 'Matsuura Kanan',
+		'eri': 'Ayase Eli', 'honky': 'Kousaka Honoka', 'birb': 'Minami Kotori', 'yohane': 'Tsushima Yoshiko', 'maru': 'Kunikida Hanamaru'}
+		
+		ubox = ['eli', 'rin', 'hanayo', 'honoka', 'kotori', 'maki', 'umi', 'nozomi', 'nico', 'hana', 'honk', 'birb']
+		abox = ['chika', 'riko', 'you', 'yoshiko', 'ruby', 'hanamaru', 'mari', 'dia', 'kanan', 'yohane', 'maru']
+		# nbox = ['ayumu', 'setsuna', 'shizuku', 'karin', 'kasumi', 'ai', 'rina', 'kanata', 'emma']
+
+		if self.scouting:
+			await message.channel.send('```prolog\n Chotto. I\'m busy doing some gacha now ( ﾟдﾟ)...```')
+			return
+
+		rarity = ['r', 'sr', 'ssr', 'ur']
+		rarity_bt = ['sr', 'ur']
+		rarity_bt10 = ['ssr', 'ur']
+		rarity_bt25 = ['ur']
+		rarity_dream = ['sr', 'ssr', 'ur']
+
+		icon = {'n': '**N**', 'r': '**R**', 'sr': '**SR**', 'ssr': '**SSR**', 'ur': '**UR**'}
+
+		rrate = 0.8
+		srrate = 0.15
+		ssrrate = 0.04
+		urrate = 0.01
+
+		bturrate = 0.2
+		btsrrate = 0.8
+
+		dreamsrrate = 0.5
+		dreamssrrate = 0.3
+		dreamurrate = 0.2
+
+		cardlist = []
+
+		url = "https://schoolido.lu/api/cardids/?is_promo=False"
+
+		#Default params
+		scout_num = 11
+		scout_ticket = False
+		scout_ticket_num = 5
+		scout_idlz = False
+		scout_box = ubox
+
+		dream = False
+		failed = 0
+
+		scout_args = list(args)
+
+		self.scouting = True
+
+		while len(scout_args) > 0:
+			query = scout_args.pop(0).lower()
+			if query in ["bt", "bt10", "bt25"]:
+				scout_ticket = True
+				scout_num = 1
+				if query == "bt10":
+					scout_ticket_num = 10
+				elif query == "bt25":
+					scout_ticket_num = 25
+			if query == "idlz":
+				scout_idlz = True
+			if query == "dream":
+				dream = True
+				scout_num = 11
+			if query == "muse":
+				scout_box = ubox
+			if query == "aqours":
+				scout_box = abox
+			if query in ubox + abox: # + nbox:
+				scout_box = query
+			if query.isdigit():
+				scout_num = int(query)
+				if scout_num != 1 and scout_num != 11:
+					scout_num = 11
+
+		logger.debug("Box: %s - Quantity: %s - Blue ticket: %s" % (scout_box, scout_num, scout_ticket))
+
+		if scout_box == ubox:
+			url += "&idol_main_unit=%CE%BC%27s"
+		elif scout_box == abox:
+			url += "&idol_main_unit=aqours"
+		elif scout_box in (ubox + abox): # + nbox):
+			# url += "&name=%s" % idol_name[scout_box]
+			url += f'&name={SIF_IDOL_NAMES[scout_box]}'
+		logger.debug("URL: %s" % url)
+
+		if scout_num == 11:
+			scout = random.choices(rarity, k=11, weights=[rrate, srrate, ssrrate, urrate])
+			if dream == True:
+				scout = random.choices(rarity_dream, k=11, weights=[dreamsrrate, dreamssrrate, dreamurrate])
+		elif scout_num == 1:
+			if scout_ticket == False:
+				scout = random.choices(rarity, k=1, weights=[rrate, srrate, ssrrate, urrate])
+			else:
+				if scout_ticket_num == 5:
+					scout = random.choices(rarity_bt, k=1, weights=[btsrrate, bturrate])
+				elif scout_ticket_num == 10:
+					scout = random.choices(rarity_bt10, k=1, weights=[btsrrate, bturrate])
+				elif scout_ticket_num == 25:
+					scout = random.choices(rarity_bt25, k=1, weights=[1])
+
+		rs = list(set(scout))
+		rarity_count = {x: scout.count(x) for x in rs}
+
+		async with message.channel.typing():
+			async with aiohttp.ClientSession() as session:
+				for k, v in rarity_count.items():
+					async with session.get(url + f'&rarity={k}') as r:
+						if r.status == 200:
+							js = await r.json()
+							card_num = random.choices(js, k=v)
+							cardlist.extend(card_num)
+						else:
+							failed = 1
+							logger.error("Network error.")
+							await message.channel.send('```prolog\nServer Error. Please try again later (ノ_・。)```')
+							self.scouting = False
+							return
+
+				result = ""
+				scout_11_bg = os.path.join('assets', 'scout_bg.jpg')
+				scout_11_bg_im = Image.open(scout_11_bg)
+
+				current_result = '```css\n'
+				for i, x in enumerate(cardlist):
+					url = "https://schoolido.lu/api/cards/%s/" % x	
+					async with session.get(url) as r:
+						js = await r.json()
+						card_name = js['idol']['name']
+						card_rarity = js['rarity']
+						card_id = js['id']
+						card_set = js['translated_collection']
+						card_date = js['release_date']
+						card_attrb = js['attribute']
+						card_skill = js['skill']
+						card_hp = js['hp']
+						if scout_idlz == False:
+							card_img = 'https:%s' % (js['card_image'])
+						else:
+							card_img = 'https:%s' % (js['card_idolized_image'])
+
+						current_result += f'#{card_id} {card_rarity} {card_name} '
+						if str(card_set).lower() != "none":
+							current_result += f'[{card_set}, {card_date}] '
+						else:
+							current_result += f'[{card_date}] '
+						current_result += f'({card_attrb}, {card_skill}, HP: {card_hp})\n'
+						
+						if scout_num == 11:
+							try:
+								round_card_img = f"https:{js['round_card_image']}"
+								if round_card_img is None or scout_idlz:
+									raise KeyError
+							except KeyError:
+								round_card_img = f"https:{js['round_card_idolized_image']}"
+						
+							path = os.path.join('game_cache', 'scout', f'{x}.png')
+							if os.path.exists(path):
+								pass
+							else:
+								r = requests.get(round_card_img)
+								with open(path, mode='wb+') as f:
+									f.write(r.content)
+							im = Image.open(path).convert('RGBA')
+							if i <= 5:
+								offset = (159 + i * 160, 70)
+							else:
+								offset = (239 + (i - 6) * 160, 260)
+							scout_11_bg_im.paste(im, offset, im)
+						
+						if scout_num == 1:
+							embed = discord.Embed()
+							embed.set_image(url=card_img)
+							kwargs = {
+								'embed': embed
+							}
+
+			if scout_num == 11:
+				path = os.path.join('game_cache', 'scout.jpg')
+				scout_11_bg_im.crop((90, 20, 1140, 420)).save(path)
+				kwargs = {
+					'file': discord.File(path)
+				}
+
+			game_cache_scout = os.path.join('game_cache', 'scout')
+			if os.path.exists(game_cache_scout):
+				shutil.rmtree(game_cache_scout)
+
+			os.mkdir(game_cache_scout)
+
+			await message.channel.send(current_result + '```', **kwargs)
+
+		self.scouting = False
