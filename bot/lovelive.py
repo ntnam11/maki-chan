@@ -2,6 +2,7 @@ import aiohttp
 import discord
 import random
 import requests
+import os
 import logging
 
 from bs4 import BeautifulSoup

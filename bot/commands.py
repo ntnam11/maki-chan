@@ -137,9 +137,17 @@ class Commands(Music, Games, LoveLive, Misc):
 			{command_prefix}avatar
 			{command_prefix}avatar @_Kotori_
 		'''
-		# if len(args) > 0:
+		embed = discord.Embed()
 
-		await message.channel.send(f'Hi! This is my avatar <3\n{self.user.avatar_url}')
+		if len(args) > 0:
+			if len(message.mentions) > 0:
+				target = message.mentions[0]
+				embed.set_image(url=target.avatar_url)
+				await message.channel.send(f'{target.name}\'s avatar', embed=embed)
+				return
+
+		embed.set_image(url=self.user.avatar_url)
+		await message.channel.send('Hi! This is my avatar :heart:', embed=embed)
 
 	async def cmd_help(self, message, command, *args, **kwargs):
 		'''
@@ -200,7 +208,7 @@ class Commands(Music, Games, LoveLive, Misc):
 				await self.voice_client.disconnect()
 		
 		await message.channel.send(':wave:')
-		exit()
+		raise SleepException
 
 	async def cmd_flush(self, message, *args):
 		'''
@@ -281,7 +289,7 @@ class Commands(Music, Games, LoveLive, Misc):
 		except Exception as e:
 			cmd_result = repr(e)
 		result = '```python\n%s```' % (cmd_result)
-		await message.channel.send(result)
+		await send_long_message(message.channel, result, prefix='```python', suffix='```')
 
 	@owner_only
 	async def cmd_message(self, message, uid, content, *args):
@@ -335,7 +343,7 @@ class Commands(Music, Games, LoveLive, Misc):
 				return
 		except ValueError:
 			await message.channel.send('```Invalid server ID```')
-		await message.channel.send('```prolog\nI\'m not in that server (*´д｀*)```')
+		await message.channel.send('```prolog\nI\'m not in that server (\*´д｀*)```')
 
 	@owner_only
 	async def cmd_config(self, message, key, value, *args):
@@ -418,6 +426,7 @@ class Commands(Music, Games, LoveLive, Misc):
 			'Randomcard': check['cardgame']['status'],
 			'Cardinfo': check['cardgame']['status'],
 			'Idolinfo': check['cardgame']['status'],
+			'Scout': check['cardgame']['status']
 		}
 		
 		strresult = ''

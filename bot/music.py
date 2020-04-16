@@ -7,6 +7,7 @@ import logging
 import random
 import requests
 import re
+import time
 
 from bs4 import BeautifulSoup
 
@@ -120,7 +121,7 @@ class MusicPlayer:
 			s = Song(query, title)
 			r = await self._add_to_queue(s)
 			if r['error']:
-				await self.voice_text_channel.send('```fix\This video is not available (*´д｀*)```')
+				await self.voice_text_channel.send('```fix\This video is not available (\*´д｀*)```')
 				return
 		
 		else:
@@ -200,7 +201,7 @@ class Music(MusicPlayer):
 	def __init__(self):
 		return super(Music, self).__init__()
 	
-	async def cmd_join(self, message, *args):
+	async def cmd_join(self, message, *args, internal=False):
 		'''
 		Join a voice channel
 		Command group: Music
@@ -209,7 +210,7 @@ class Music(MusicPlayer):
 		'''
 		if self.voice_client:
 			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now (*´д｀*)```')
+				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now (\*´д｀*)```')
 				return {'error': True}
 
 		try:
@@ -226,7 +227,8 @@ class Music(MusicPlayer):
 			await message.channel.send('```css\nCould not connect to the voice channel in time```')
 			return {'error': True}
 		except discord.ClientException:
-			await message.channel.send('```css\nAlready connected to voice channel```')
+			if not internal:
+				await message.channel.send('```css\nAlready connected to voice channel```')
 			return {'error': True}
 		except discord.opus.OpusNotLoaded:
 			try:
@@ -399,7 +401,7 @@ class Music(MusicPlayer):
 				await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
 				await self._process_queue()
 			else:
-				await message.channe.send('```fix\nWell, you may need to turn off looping before skipping```')
+				await message.channel.send('```fix\nWell, you may need to turn off looping before skipping```')
 		else:
 			await message.channel.send('```fix\nNothing to skip at the moment```')
 
@@ -469,7 +471,7 @@ class Music(MusicPlayer):
 		else:
 			await message.channel.send('```prolog\nLoop: off```')
 
-	async def cmd_llradio(self, message, *args, internal=False):
+	async def cmd_llradio(self, message, *args):#, internal=False, retry_count=0):
 		'''
 		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
 		If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot
@@ -481,6 +483,10 @@ class Music(MusicPlayer):
 		'''
 		if self.playing_radio and not internal:
 			await message.channel.send('```prolog\nI\'m playing radio now щ(ಠ益ಠщ)```')
+			return
+
+		if retry_count >= 3:
+			await message.channel.send('```fix\nError trying to play some music. Please contact the bot\'s owner (\*´д｀*)```')
 			return
 
 		song_cache = os.path.join('game_cache', 'songs')
@@ -569,4 +575,9 @@ class Music(MusicPlayer):
 
 		await message.channel.send(f'```{md}\n{prefix} Now playing: {song_name}```')
 
-		self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message, internal=True), self.loop))
+		try:
+			self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message, internal=True, retry_count=retry_count), self.loop))
+		except discord.errors.ClientException:
+			logger.warning('Cannot play music. Trying again...')
+			await self.cmd_join(message, internal=True)
+			self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message, internal=True, retry_count=retry_count + 1), self.loop))

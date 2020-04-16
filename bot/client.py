@@ -245,7 +245,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 						await self.close()
 					except Exception as e:
 						try:
-							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls (*´д｀*)" % (repr(e), traceback.format_exc().replace('```', '\```'))
+							errmsg = "Error: %s\n```%s```\nSend this to the bot's owner, pls (\*´д｀*)" % (repr(e), traceback.format_exc().replace('```', '\```'))
 							await message.channel.send(errmsg)
 						except:
 							pass

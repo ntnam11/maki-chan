@@ -681,7 +681,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				self._create_song_list()
 				await message.channel.send('```css\nDatabase updated```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (\*´д｀*)```')
 			return
 
 		song_cache = os.path.join('game_cache', 'songs')
@@ -705,12 +705,12 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				else:
 					await message.channel.send('```prolog\nSong existed```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (\*´д｀*)```')
 			return
 
 		if self.voice_client:
 			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nI\'m busy playing some music now (*´д｀*)```')
+				await message.channel.send('```prolog\nI\'m busy playing some music now (\*´д｀*)```')
 
 		if not self.voice_client:
 			r = await self.cmd_join(message)
@@ -738,7 +738,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return m.channel == message.channel
 
 		if round_num > 50:
-			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (*´д｀*)```")
+			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (\*´д｀*)```")
 			self.playing_songgame = False
 			return
 		
@@ -1005,8 +1005,6 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		rarity_bt10 = ['ssr', 'ur']
 		rarity_bt25 = ['ur']
 		rarity_dream = ['sr', 'ssr', 'ur']
-
-		icon = {'n': '**N**', 'r': '**R**', 'sr': '**SR**', 'ssr': '**SSR**', 'ur': '**UR**'}
 
 		rrate = 0.8
 		srrate = 0.15
