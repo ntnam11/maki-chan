@@ -471,7 +471,7 @@ class Music(MusicPlayer):
 		else:
 			await message.channel.send('```prolog\nLoop: off```')
 
-	async def cmd_llradio(self, message, *args):#, internal=False, retry_count=0):
+	async def cmd_llradio(self, message, *args, internal=False, retry_count=0):
 		'''
 		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
 		If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot
