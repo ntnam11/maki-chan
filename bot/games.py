@@ -17,12 +17,14 @@ import aiohttp
 import discord
 import yaml
 from PIL import Image
+from PIL import ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from bs4 import BeautifulSoup
 
 from .common import *
 from .exceptions import *
 
-logger = logging.getLogger('Games')
+logger = logging.getLogger('root.Games')
 
 def normalize_text(s):
 	s = s.lower()
@@ -147,7 +149,7 @@ class Games:
 			return
 
 		def _cond(m):
-			return m.channel == message.channel
+			return m.channel == message.channel and m.author == message.author
 
 		if card_num > 50:
 			checktimeout = False
@@ -255,89 +257,100 @@ class Games:
 			card_max = self.config['max_sif_cards']
 
 			async with message.channel.typing():
-				network_timeout = 0
-				while network_timeout < 5:
-					random_num = random.randint(1, card_max)
-					url = f'https://schoolido.lu/api/cards/{random_num}'
-					if all_stars:
-						url = 'https://idol.st/allstars/cards/random/'
-					logger.debug(f'Searched {url}')
-					async with aiohttp.ClientSession() as session:
-						async with session.get(url) as r:
-							if r.status == 404:
-								card_max = card_max / 2
-								pass
-							elif r.status == 200:
-								if not all_stars:
-									js = await r.json()
-									if 'detail' in js:
+				retries = 0
+				while True:
+					try:
+						network_timeout = 0
+						while network_timeout < 5:
+							random_num = random.randint(1, card_max)
+							url = f'https://schoolido.lu/api/cards/{random_num}'
+							if all_stars:
+								url = 'https://idol.st/allstars/cards/random/'
+							logger.debug(f'Searched {url}')
+							async with aiohttp.ClientSession() as session:
+								async with session.get(url) as r:
+									if r.status == 404:
 										card_max = card_max / 2
+										pass
+									elif r.status == 200:
+										if not all_stars:
+											js = await r.json()
+											if 'detail' in js:
+												card_max = card_max / 2
+											else:
+												selected_idol = js['idol']['name']
+												if (selected_idol in SIF_IDOL_NAMES.values()):
+													key = random.choice(['card_image', 'card_idolized_image'])
+													img = f'https:{js[key]}'
+													selected_card = js['id']
+													if img == "http:None" or img == "https:None":
+														img = 'https:%s' % (js['card_idolized_image'])
+													logger.debug(f'Found {img}')
+													break
+										else:
+											soup = BeautifulSoup(await r.read(), 'html5lib')
+											path = r.url.path
+											selected_card = re.findall(r'\d+', path)[0]
+											idol = soup.find('tr', {'data-field': 'idol'})
+											selected_idol = idol.find('a', {'class': None}).attrs['data-ajax-title']
+											if selected_idol in SIF_IDOL_NAMES.values():
+												images = soup.find_all('img', {'class': 'allstars-card-image'})
+												image = random.choice(images)
+												img = 'https:' + urllib.parse.quote(f"{image.attrs['src']}")
+												e_rarity = soup.find('tr', {'data-field': 'rarity'}).text
+												rarity = e_rarity.replace('Rarity', '').strip()
+												logger.debug(f'Found {img}')
+												break
 									else:
-										selected_idol = js['idol']['name']
-										if (selected_idol in SIF_IDOL_NAMES.values()):
-											key = random.choice(['card_image', 'card_idolized_image'])
-											img = f'https:{js[key]}'
-											selected_card = js['id']
-											if img == "http:None" or img == "https:None":
-												img = 'https:%s' % (js['card_idolized_image'])
-											logger.debug(f'Found {img}')
-											break
-								else:
-									soup = BeautifulSoup(await r.read(), 'html5lib')
-									path = r.url.path
-									selected_card = re.findall(r'\d+', path)[0]
-									idol = soup.find('tr', {'data-field': 'idol'})
-									selected_idol = idol.find('a', {'class': None}).attrs['data-ajax-title']
-									if selected_idol in SIF_IDOL_NAMES.values():
-										images = soup.find_all('img', {'class': 'allstars-card-image'})
-										image = random.choice(images)
-										img = 'https:' + urllib.parse.quote(f"{image.attrs['src']}")
-										e_rarity = soup.find('tr', {'data-field': 'rarity'}).text
-										rarity = e_rarity.replace('Rarity', '').strip()
-										logger.debug(f'Found {img}')
-										break
-							else:
-								logger.warning('Network timed out.')
-								network_timeout += 1
-								time.sleep(3)
-				
-				if network_timeout == 5:
-					await message.channel.send('```Something wrong with the API server. Please contact bot owner / try again later```')
-					self.playing_cardgame = False
-					return
+										logger.warning('Network timed out.')
+										network_timeout += 1
+										time.sleep(3)
+						
+						if network_timeout == 5:
+							await message.channel.send('```Something wrong with the API server. Please contact bot owner / try again later```')
+							self.playing_cardgame = False
+							return
 
-				if not all_stars:
-					fd = urllib.request.urlopen(img)
-					image_file = io.BytesIO(fd.read())
-				else:
-					r = requests.get(img)
-					image_file = io.BytesIO(r.content)
-				im = Image.open(image_file)
-				path = "%s/%s.png" % (dirpath, selected_card)
-				im.save(path)
+						if not all_stars:
+							fd = urllib.request.urlopen(img)
+							image_file = io.BytesIO(fd.read())
+						else:
+							r = requests.get(img)
+							image_file = io.BytesIO(r.content)
+						im = Image.open(image_file)
+						path = "%s/%s.png" % (dirpath, selected_card)
+						im.save(path)
 
-				#Crop image and send
-				if all_stars:
-					zoom = 640 / 1800
-					rarity_x_start = {
-						'rare': 500,
-						'super rare': 0,
-						'ultra rare': 0
-					}
-					rarity_x_end = {
-						'rare': 1300,
-						'super rare': 1800,
-						'ultra rare': 1800
-					}
-					x_range = [int(rarity_x_start[rarity.lower()] * zoom), int(rarity_x_end[rarity.lower()] * zoom - diff_size[diff])]
-					y_range = [0, int(900 * zoom - diff_size[diff])]
-				x = random.randint(*x_range)
-				y = random.randint(*y_range)
-				area = (x, y, x+diff_size[diff], y+diff_size[diff])
-				cropped_img = im.crop(area)
+						#Crop image and send
+						if all_stars:
+							zoom = 640 / 1800
+							rarity_x_start = {
+								'rare': 500,
+								'super rare': 0,
+								'ultra rare': 0
+							}
+							rarity_x_end = {
+								'rare': 1300,
+								'super rare': 1800,
+								'ultra rare': 1800
+							}
+							x_range = [int(rarity_x_start[rarity.lower()] * zoom), int(rarity_x_end[rarity.lower()] * zoom - diff_size[diff])]
+							y_range = [0, int(900 * zoom - diff_size[diff])]
+						x = random.randint(*x_range)
+						y = random.randint(*y_range)
+						area = (x, y, x+diff_size[diff], y+diff_size[diff])
+						cropped_img = im.crop(area)
 
-				temp_path = "%s/%s_cropped.png" % (dirpath, selected_card)
-				cropped_img.save(temp_path)
+						temp_path = "%s/%s_cropped.png" % (dirpath, selected_card)
+						cropped_img.save(temp_path)
+					except OSError:
+						logger.error('Error occurred. Continue searching')
+						retries += 1
+						if retries == 5:
+							raise
+						pass
+					else:
+						break
 
 				await message.channel.send("Question %d of %d. Guess who?" % (count + 1, card_num), file=discord.File(temp_path))
 
@@ -446,7 +459,7 @@ class Games:
 			return
 
 		def _cond(m):
-			return m.channel == message.channel
+			return m.channel == message.channel and m.author == message.author
 
 		if round_num > 50:
 			checktimeout = False
@@ -735,7 +748,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return
 
 		def _cond(m):
-			return m.channel == message.channel
+			return m.channel == message.channel and m.author == message.author
 
 		if round_num > 50:
 			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (\*´д｀*)```")
@@ -1037,7 +1050,11 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		self.scouting = True
 
 		while len(scout_args) > 0:
-			query = scout_args.pop(0).lower()
+			query = scout_args.pop(0)
+			if query is None:
+				continue
+			else:
+				query = query.lower()
 			if query in ["bt", "bt10", "bt25"]:
 				scout_ticket = True
 				scout_num = 1

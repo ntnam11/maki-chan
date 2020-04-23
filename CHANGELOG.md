@@ -1,5 +1,17 @@
 # Changelogs
 
+## [0.3.1] - 2020-04-23
+### Added
+#### New Commands
+- `calc`
+- `songinfo`
+### Modified
+- rewrite `lyrics` song-searching method
+- additional user-checking with games
+### Bug fixed
+- `scout` without parameters
+- random `cardgame` errors
+
 ## [0.3.0] - 2020-04-16
 ### Added
 - new method to send long message (over 2000 characters)

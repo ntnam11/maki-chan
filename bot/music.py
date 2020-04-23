@@ -329,7 +329,7 @@ class Music(MusicPlayer):
 			await message.channel.send(str_result)
 				
 		def _cond(m):
-			return m.channel == message.channel
+			return m.channel == message.channel and m.author == message.author
 
 		start = int(time.time())
 		checktimeout = False
@@ -486,7 +486,7 @@ class Music(MusicPlayer):
 			return
 
 		if retry_count >= 3:
-			await message.channel.send('```fix\nError trying to play some music. Please contact the bot\'s owner (\*´д｀*)```')
+			await message.channel.send('```fix\nError trying to play some music. Please contact the bot\'s owner (*´д｀*)```')
 			return
 
 		song_cache = os.path.join('game_cache', 'songs')

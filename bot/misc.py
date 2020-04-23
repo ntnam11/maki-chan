@@ -95,3 +95,23 @@ class Misc:
 		result = random.choice(choices)
 			
 		await message.channel.send(f'Well, I choose **{result}**!')
+
+	async def cmd_calc(self, message, expr, *args):
+		'''
+		Help u to calculate something lmao
+		Command group: Misc
+		Usage: {command_prefix}calc [expression]
+		Example: {command_prefix}calc 123*(456-789)
+		'''
+		expr = ''.join([expr, *args]).replace(' ', '')
+		for s in expr:
+			if not s.isdigit() and s not in ['+', '-', '*', '/', 'x', '^']:
+				await message.channel.send(f'```fix\nSyntax Error. Please try again ┐(‘～`；)┌```')
+				return
+		r = expr.replace('x', '*').replace('^', '**')
+		try:
+			result = eval(r)
+		except Exception as e:
+			await message.channel.send(f'```fix\nSyntax Error. Please try again ┐(‘～`；)┌```')
+			return
+		await message.channel.send(f'```python\n{result}```')

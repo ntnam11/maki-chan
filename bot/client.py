@@ -8,6 +8,7 @@ from textwrap import dedent
 from inspect import signature
 import datetime
 import random
+import time
 
 import discord
 
@@ -164,7 +165,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 			return
 		if hour <= active_from and hour >= active_to:
 			if message:
-				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
+				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from + 1}```'), self.loop)
 			if self.voice_client:
 				asyncio.run_coroutine_threadsafe(self.cmd_leave(message), self.loop)
 			print('Sleep time...')
