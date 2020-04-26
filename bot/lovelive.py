@@ -281,13 +281,13 @@ class LoveLive:
 
 				if (checktimeout == True) or (not response_message):
 					await message.channel.send('```fix\nTimeout. Request aborted```')
-					return
+					return ''
 
 				resp = response_message.content.lower()
 
 				if (resp == 'c'):
 					await message.channel.send('```css\nOkay. Nevermind```')
-					return
+					return ''
 
 				if not resp.isdigit() or int(resp) not in range(0, len(found)):
 					await message.channel.send('```fix\nPlease type the correct number```')
@@ -347,15 +347,24 @@ class LoveLive:
 		
 		url = await self._get_song_url(message, q)
 
+		if url == '':
+			return
+
 		r = requests.get(url)
 		soup = BeautifulSoup(r.content, 'html5lib')
 		song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+
+		info = soup.find('div', {'id': 'mw-content-text'})
+		p = info.find_all('p')[0].text.strip()
+
 		thumbnail_url = soup.find('img', {'class': 'pi-image-thumbnail'}).attrs['src']
 		sections = soup.find_all('section', {'class': 'pi-item'})
 
 		embed = discord.Embed()
 		embed.set_author(name=song_name)
 		embed.set_image(url=thumbnail_url)
+
+		embed.add_field(name='Summary', value=p, inline=False)
 
 		for section in sections:
 			section_name = section.find('h2').text.strip()

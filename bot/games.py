@@ -149,7 +149,7 @@ class Games:
 			return
 
 		def _cond(m):
-			return m.channel == message.channel and m.author == message.author
+			return m.channel == message.channel
 
 		if card_num > 50:
 			checktimeout = False
@@ -161,7 +161,7 @@ class Games:
 				if (int(time.time() - start) >= 5):
 					checktimeout = True
 				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=10)
+					response_message = await self.wait_for('message', check=_cond and m.author == message.author, timeout=10)
 				except asyncio.TimeoutError:
 					checktimeout = True
 				else:
@@ -459,7 +459,7 @@ class Games:
 			return
 
 		def _cond(m):
-			return m.channel == message.channel and m.author == message.author
+			return m.channel == message.channel
 
 		if round_num > 50:
 			checktimeout = False
@@ -471,7 +471,7 @@ class Games:
 				if (int(time.time() - start) >= 5):
 					checktimeout = True
 				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=10)
+					response_message = await self.wait_for('message', check=_cond and m.author == message.author, timeout=10)
 				except asyncio.TimeoutError:
 					checktimeout = True
 				else:
@@ -748,7 +748,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return
 
 		def _cond(m):
-			return m.channel == message.channel and m.author == message.author
+			return m.channel == message.channel
 
 		if round_num > 50:
 			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (\*´д｀*)```")
@@ -790,32 +790,15 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		strresult = ""
 		
 		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nLength: {duration} seconds\nNumber of rounds: {round_num}```\nGame starts in 5 seconds. Be ready!')
-		checkstart = False
 		checktimeout = False
-		start = int(time.time())
-		logger.debug("Game called at %s" % (start))
+		logger.debug("Game called at %s" % int(time.time()))
 		
 		game = discord.Game('Song Game with friends')
 		await self.change_presence(activity=game)
 		
-		while True:
-			if (int(time.time()) - start >= 5):
-				checkstart = True
-			try:
-				response_message = await self.wait_for('message', check=_cond, timeout=5)
-			except asyncio.TimeoutError:
-				checkstart = True
-			else:
-				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
-					self.playing_songgame = False
-					return
-			
-			if (checkstart == True):
-				logger.debug("Game starts at %s" % int(time.time()))
-				await message.channel.send("Music start!")
-				time.sleep(1)
-				break
+		logger.debug("Game starts at %s" % int(time.time()))
+		await message.channel.send("Music start!")
+		time.sleep(1)
 
 		stop = False
 

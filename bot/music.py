@@ -473,7 +473,7 @@ class Music(MusicPlayer):
 
 	async def cmd_llradio(self, message, *args, internal=False, retry_count=0):
 		'''
-		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
+		Play a random Love Live! song (including Sunshine, Nijigasaki & Saint Snow)
 		If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot
 		Command group: Music
 		Usage:
@@ -481,9 +481,17 @@ class Music(MusicPlayer):
 		Example:
 			{command_prefix}llradio
 		'''
-		if self.playing_radio and not internal:
-			await message.channel.send('```prolog\nI\'m playing radio now щ(ಠ益ಠщ)```')
-			return
+		if not internal:
+			if self.playing_radio:
+				await message.channel.send('```prolog\nI\'m playing radio now щ(ಠ益ಠщ)```')
+				return
+			if self.current_song is not None:
+				self.force_stop_music = True
+			if not self.voice_client and not self.voice_channel:
+				pass
+			else:
+				if self.voice_client.is_playing():
+					self.voice_client.stop()
 
 		if retry_count >= 3:
 			await message.channel.send('```fix\nError trying to play some music. Please contact the bot\'s owner (*´д｀*)```')
@@ -513,11 +521,16 @@ class Music(MusicPlayer):
 		self.check_sleep(message)
 
 		while True:
-			song_url = random.choice(songs_available)
-			if song_url in self.radio_cache:
-				continue
+			if len(self.music_queue) > 0:
+				song_url = self.music_queue.pop()
+				if song_url not in self.radio_cache:
+					self.radio_cache.append(song_url)
 			else:
-				self.radio_cache.append(song_url)
+				song_url = random.choice(songs_available)
+				if song_url in self.radio_cache:
+					continue
+				else:
+					self.radio_cache.append(song_url)
 
 			r = requests.get(song_url.strip())
 			soup =  BeautifulSoup(r.content, 'html5lib')
@@ -581,3 +594,18 @@ class Music(MusicPlayer):
 			logger.warning('Cannot play music. Trying again...')
 			await self.cmd_join(message, internal=True)
 			self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message, internal=True, retry_count=retry_count + 1), self.loop))
+
+	async def cmd_request(self, message, query, *args):
+		'''
+		Request a song on Love Live! radio (including Sunshine, Nijigasaki & Saint Snow)
+		Command group: Music
+		Usage:
+			{command_prefix}request [song_name] [singer/off vocal]
+		Example:
+			{command_prefix}request Spicaterrible
+			{command_prefix}request Spicaterrible kotori
+			{command_prefix}request Spicaterrible off vocal
+		'''
+
+		if not self.playing_radio:
+			await self.cmd_llradio(message)
