@@ -31,12 +31,15 @@ ytdl_format_options = {
 logger = logging.getLogger('Music')
 
 class Song:
-	def __init__(self, url, title, downloaded=False):
-		if not url.startswith('https'):
-			self.id = url
-			self.url = 'https://www.youtube.com/watch?v=' + url
+	def __init__(self, url, title, youtube=True, source='', downloaded=False):
+		if youtube:
+			if not url.startswith('https'):
+				self.id = url
+				self.url = 'https://www.youtube.com/watch?v=' + url
+			else:
+				self.id = url.split('?v=')[1]
+				self.url = url
 		else:
-			self.id = url.split('?v=')[1]
 			self.url = url
 
 		self.title = url
@@ -47,6 +50,7 @@ class Song:
 		self.downloading = False
 		self.downloaded = downloaded
 		self.file_path = ''
+		self.source = source
 
 	def _download(self, cls):
 
@@ -104,7 +108,7 @@ class MusicPlayer:
 
 		return {'error': False, 'result': result}
 
-	async def _process_query(self, *args, **kwargs):
+	async def _process_query(self, *args, source='', **kwargs):
 		query = ' '.join(args)
 		if query.startswith('youtube') or query.startswith('yt'):
 			try:
@@ -118,10 +122,10 @@ class MusicPlayer:
 			title = None
 		
 		if query.startswith('https://www.youtube.com'):
-			s = Song(query, title)
+			s = Song(query, title, source=source)
 			r = await self._add_to_queue(s)
 			if r['error']:
-				await self.voice_text_channel.send('```fix\This video is not available (\*´д｀*)```')
+				await self.voice_text_channel.send('```fix\This video is not available (*´д｀*)```')
 				return
 		
 		else:
@@ -130,7 +134,7 @@ class MusicPlayer:
 				i = 0
 				while True:
 					s = r['result'][i]
-					song = Song(s['id'], s['title'])
+					song = Song(s['id'], s['title'], source=source)
 					ar = await self._add_to_queue(song)
 					if not ar['error']:
 						break
@@ -139,7 +143,10 @@ class MusicPlayer:
 	async def _add_to_queue(self, song_obj):
 		self.music_queue.append(song_obj)
 		
-		await self.voice_text_channel.send('Adding %s...' % song_obj.url)
+		if song_obj.source == 'search':
+			await self.voice_text_channel.send(f'Adding {song_obj.url}...')
+		else:
+			await self.voice_text_channel.send(f'```css\nAdding {song_obj.url}...```')
 
 		for song in self.music_queue:
 			if not song.downloaded and not song.downloading:
@@ -189,7 +196,8 @@ class MusicPlayer:
 		
 		source = discord.FFmpegPCMAudio(self.current_song.file_path, executable='ffmpeg')
 
-		await self.voice_text_channel.send('```fix\nNow playing: %s```' % self.current_song.title)
+		if not self.music_loop:
+			await self.voice_text_channel.send('```fix\nNow playing: %s```' % self.current_song.title)
 
 		try:
 			self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self._process_queue(), self.loop))
@@ -210,7 +218,7 @@ class Music(MusicPlayer):
 		'''
 		if self.voice_client:
 			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now (\*´д｀*)```')
+				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now (´д｀*)```')
 				return {'error': True}
 
 		try:
@@ -241,6 +249,7 @@ class Music(MusicPlayer):
 		await message.channel.send('```css\nConnected to "%s"```' % self.voice_channel.name)
 		return {'error': False}
 	
+	@message_voice_filter
 	async def cmd_leave(self, message, *args):
 		'''
 		Leave a voice channel
@@ -267,6 +276,7 @@ class Music(MusicPlayer):
 		self.radio_cache = []
 		self.force_stop_music = False
 
+	@message_voice_filter
 	async def cmd_play(self, message, query, *args):
 		'''
 		(Search and) Queue a youtube video url
@@ -298,6 +308,7 @@ class Music(MusicPlayer):
 		async with message.channel.typing():
 			await self._process_query(*[query, *args])
 
+	@message_voice_filter
 	async def cmd_search(self, message, query, *args):
 		'''
 		Search a video on youtube, up to 10 results
@@ -364,7 +375,7 @@ class Music(MusicPlayer):
 			await self.cmd_join(message)
 
 		async with message.channel.typing():
-			await self._process_query('https://www.youtube.com/watch?v=' + r['result'][int(resp)]['id'], title=r['result'][int(resp)]['title'])
+			await self._process_query('https://www.youtube.com/watch?v=' + r['result'][int(resp)]['id'], title=r['result'][int(resp)]['title'], source='search')
 
 	async def cmd_np(self, message, *args):
 		'''
@@ -382,6 +393,7 @@ class Music(MusicPlayer):
 		else:
 			await message.channel.send('```fix\nNothing is being played at the moment. Wanna add some?```')
 
+	@message_voice_filter
 	async def cmd_skip(self, message, *args):
 		'''
 		Skip current playing song in voice channel
@@ -389,21 +401,61 @@ class Music(MusicPlayer):
 		Usage: {command_prefix}skip
 		Example: {command_prefix}skip
 		'''
+		if not self.playing_radio and not self.current_song:
+			await message.channel.send('```fix\nNothing to skip at the moment```')
+			return
+
+		if self.voice_channel is not None:
+			member_count = len(self.voice_channel.members)
+			if member_count > 2:
+				votes_needed = int(member_count / 2) + 1
+				m = await message.channel.send(f'```css\nSkip requested. React with ➕ to skip this song ({votes_needed + 1} needed)```')
+				await m.add_reaction('➕')
+				
+				msg_check_id = m.id
+
+				start_time = time.time()
+				
+				def _check(reaction, user):
+					return str(reaction.emoji) == '➕' and user in self.voice_channel.members
+				
+				skip = False
+
+				while True:
+					m = await message.channel.fetch_message(msg_check_id)
+					
+					if int(time.time() - start_time) > 10:
+						break
+
+					try:
+						if m.reactions[0].count > votes_needed:
+							skip = True
+							break
+					except IndexError:
+						pass
+
+					time.sleep(.5)
+
+				if not skip:
+					await message.channel.send('```css\nHm... Skip request aborted```')
+					return
+				else:
+					await message.channel.send('```css\nOkay. Changing media...```')
+
 		if self.playing_radio:
 			if self.voice_client:
 				if self.voice_client.is_playing():
 					self.voice_client.stop()
-			# await self.cmd_llradio(message)
-			return
-		if self.current_song:
+			# if len(self.music_queue) > 0:
+			# 	await self.cmd_llradio(message, internal=True)
+			# return
+		elif self.current_song:
 			self.voice_client.stop()
 			if not self.music_loop:
 				await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
 				await self._process_queue()
 			else:
 				await message.channel.send('```fix\nWell, you may need to turn off looping before skipping```')
-		else:
-			await message.channel.send('```fix\nNothing to skip at the moment```')
 
 	async def cmd_queue(self, message, *args):
 		'''
@@ -425,6 +477,7 @@ class Music(MusicPlayer):
 
 		await message.channel.send(str_result)
 
+	@message_voice_filter
 	async def cmd_stop(self, message, *args):
 		'''
 		Force stop Love Live!! radio
@@ -449,6 +502,7 @@ class Music(MusicPlayer):
 		self.music_queue = []
 		self.music_loop = False
 		self.force_stop_music = False
+		self.playing_radio = False
 
 	async def cmd_loop(self, message, *args):
 		'''
@@ -500,7 +554,7 @@ class Music(MusicPlayer):
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
 		if not os.path.exists(song_list):
-			songs_available = self._create_song_list()
+			songs_available = create_song_list()
 		else:
 			with open(song_list, mode='r') as f:
 				songs_available = f.readlines()
@@ -520,11 +574,12 @@ class Music(MusicPlayer):
 
 		self.check_sleep(message)
 
+		song_info = None
+
 		while True:
 			if len(self.music_queue) > 0:
-				song_url = self.music_queue.pop()
-				if song_url not in self.radio_cache:
-					self.radio_cache.append(song_url)
+				song_info = self.music_queue.pop()
+				break
 			else:
 				song_url = random.choice(songs_available)
 				if song_url in self.radio_cache:
@@ -560,12 +615,17 @@ class Music(MusicPlayer):
 
 			if t.attrs['title'].lower() != 'radio drama':
 				break
+		
+		if song_info is None:
+			song_length = td.previous_sibling
+			song_name = song_length.previous_sibling.text.strip()
 
-		song_length = td.previous_sibling
-		song_name = song_length.previous_sibling.text.strip()
+			song_onclick = song_file.find('button').attrs['onclick']
+			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
 
-		song_onclick = song_file.find('button').attrs['onclick']
-		song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
+		else:
+			song_name = song_info.title
+			song_url = song_info.url
 
 		song_r = requests.get(song_url)
 		song_data = song_r.content
@@ -600,12 +660,93 @@ class Music(MusicPlayer):
 		Request a song on Love Live! radio (including Sunshine, Nijigasaki & Saint Snow)
 		Command group: Music
 		Usage:
-			{command_prefix}request [song_name] [singer/off vocal]
+			{command_prefix}request [song_name] (idol/off vocal/mix name)
 		Example:
-			{command_prefix}request Spicaterrible
-			{command_prefix}request Spicaterrible kotori
-			{command_prefix}request Spicaterrible off vocal
+			{command_prefix}request spicaterrible
+			{command_prefix}request spicaterrible (kotori)
+			{command_prefix}request spicaterrible (off vocal)
+			{command_prefix}request aishiteru banzai (prepro piano mix)
 		'''
+		q = ' '.join([query, *args]).lower()
+		singer = ''
+		off_vocal = False
+
+		o = max(q.find('off vocal'), q.find('(off vocal)'))
+		if o != -1:
+			off_vocal = True
+			q = q.replace('(off vocal)', '').replace('off vocal', '')
+
+		r = re.search('\((.*?)\)', q)
+
+		if r is not None:
+			singer = r[1]
+			q = q.replace(r[0], '')
+
+		url = await get_song_url(self, message, q.strip())
+		if url == '':
+			return
+		
+		r = requests.get(url)
+		soup = BeautifulSoup(r.content, 'html5lib')
+		song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+
+		song_files = soup.find_all('div', {'class': 'ogg_player'})
+		song_name_list = []
+		song_url_list = []
+
+		for song_file in song_files:
+			for p in song_file.parents:
+				if p.name == 'td':
+					td = p
+					break
+
+			t = None
+
+			for p in song_file.parents:
+				if 'class' in p.attrs:
+					if 'tabbertab' in p.attrs['class']:
+						t = p
+						break
+				if 'id' in p.attrs:
+					if p.attrs['id'] == 'mw-content-text':
+						break
+
+			if t is not None:
+				if t.attrs['title'].lower() == 'radio drama':
+					continue
+
+			song_length = td.previous_sibling
+			song_name = song_length.previous_sibling.text.strip()
+			song_onclick = song_file.find('button').attrs['onclick']
+			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
+
+			song_name_list.append(song_name)
+			song_url_list.append(song_url)
+
+		found = False
+
+		for i, song_name in enumerate(song_name_list):
+			if singer != '':
+				if singer.lower() in song_name.lower():
+					found = True
+					break
+			elif off_vocal:
+				if 'off vocal' in song_name.lower():
+					found = True
+					break
+			else:
+				found = True
+				break
+		
+		if found:
+			song_info = Song(song_url_list[i], song_name, youtube=False)
+		else:
+			await message.channel.send(f'```fix\nHm... I can\'t find this version. Please try another (*´д｀*)```')
+			return
+
+		self.music_queue.append(song_info)
 
 		if not self.playing_radio:
 			await self.cmd_llradio(message)
+		else:
+			await message.channel.send(f'```css\nAdded {song_info.title}```')

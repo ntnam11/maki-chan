@@ -45,38 +45,6 @@ class Games:
 	def __init__(self):
 		pass
 
-	def _create_song_list(self):
-		resource_url = 'https://love-live.fandom.com/wiki/Songs_BPM_List'
-		r = requests.get(resource_url)
-
-		soup = BeautifulSoup(r.content, 'html5lib')
-		
-		tables = soup.find_all('table', {'class': 'wikitable'})		
-		songs_available = []
-		for table in tables:
-			songs = table.find_all('a')
-			song_urls = []
-
-			for song in songs:
-				song_urls.append('https://love-live.fandom.com' + song.attrs['href'])
-			
-			songs_available.extend(song_urls)
-
-		with open(os.path.join('game_cache', 'song_additional')) as f:
-			content = f.readlines()
-
-		for line in content:
-			l = line.strip()
-			if l != '':
-				songs_available.append(l)
-
-		songs_available = list(set(songs_available))
-		
-		with open(os.path.join('game_cache', 'song_list'), mode='w+') as f:
-			f.write('\n'.join(songs_available))
-
-		return songs_available
-
 	async def cmd_cardgame(self, message, card_num, *args):
 		"""
 		Play LLSIF card guessing game
@@ -112,7 +80,7 @@ class Games:
 		"""
 		try:
 			if self.playing_cardgame:
-				await message.channel.send("The game is currently being played. Enjoy!")
+				await message.channel.send('```css\nThe game is currently being played. Enjoy!```')
 				return
 		except AttributeError:
 			self.playing_cardgame = True
@@ -161,7 +129,7 @@ class Games:
 				if (int(time.time() - start) >= 5):
 					checktimeout = True
 				try:
-					response_message = await self.wait_for('message', check=_cond and m.author == message.author, timeout=10)
+					response_message = await self.wait_for('message', check=_cond, timeout=10)
 				except asyncio.TimeoutError:
 					checktimeout = True
 				else:
@@ -228,26 +196,9 @@ class Games:
 		await self.change_presence(activity=game)
 
 		self.playing_cardgame = True
-		
-		while True:
-			if (int(time.time()) - start >= 5):
-				checkstart = True
-			try:
-				response_message = await self.wait_for('message', check=_cond, timeout=5)
-			except asyncio.TimeoutError:
-				checkstart = True
-			else:
-				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
-					self.playing_cardgame = False
-					return
-			
-			if (checkstart == True):
-				logger.debug("Game starts at %s" % int(time.time()))
-				await message.channel.send("Music start!")
-				time.sleep(1)
-				break
-		
+
+		await asyncio.sleep(5)
+
 		x_range = [100, 512 - diff_size[diff]]
 		y_range = [200, 720 - diff_size[diff]]
 		stop = False
@@ -435,14 +386,14 @@ class Games:
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
 		if not os.path.exists(song_list):
-			songs_available = self._create_song_list()
+			songs_available = create_song_list()
 		else:
 			with open(song_list, mode='r') as f:
 				songs_available = f.readlines()
 		
 		try:
 			if self.playing_lyricgame:
-				await message.channel.send("The game is currently being played. Enjoy!")
+				await message.channel.send('```css\nThe game is currently being played. Enjoy!```')
 				return
 		except AttributeError:
 			self.playing_lyricgame = True
@@ -471,7 +422,7 @@ class Games:
 				if (int(time.time() - start) >= 5):
 					checktimeout = True
 				try:
-					response_message = await self.wait_for('message', check=_cond and m.author == message.author, timeout=10)
+					response_message = await self.wait_for('message', check=_cond, timeout=10)
 				except asyncio.TimeoutError:
 					checktimeout = True
 				else:
@@ -518,24 +469,7 @@ class Games:
 		game = discord.Game('Lyrics Game with friends')
 		await self.change_presence(activity=game)
 
-		while True:
-			if (int(time.time()) - start >= 5):
-				checkstart = True
-			try:
-				response_message = await self.wait_for('message', check=_cond, timeout=5)
-			except asyncio.TimeoutError:
-				checkstart = True
-			else:
-				if (response_message.content == 'stop'):
-					await message.channel.send("Game abandoned. Thanks for calling me (´･ω･`)")
-					self.playing_lyricgame = False
-					return
-			
-			if (checkstart == True):
-				logger.debug("Game starts at %s" % int(time.time()))
-				await message.channel.send("Music start!")
-				time.sleep(1)
-				break
+		await asyncio.sleep(5)
 
 		stop = False
 
@@ -691,16 +625,16 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		"""
 		if round_num.lower() == 'update':
 			if self.check_owner(message):
-				self._create_song_list()
+				create_song_list()
 				await message.channel.send('```css\nDatabase updated```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (\*´д｀*)```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
 			return
 
 		song_cache = os.path.join('game_cache', 'songs')
 		song_list = os.path.join('game_cache', 'song_list')
 		if not os.path.exists(song_list):
-			songs_available = self._create_song_list()
+			songs_available = create_song_list()
 		else:
 			with open(song_list, mode='r') as f:
 				songs_available = f.readlines()
@@ -718,12 +652,13 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				else:
 					await message.channel.send('```prolog\nSong existed```')
 			else:
-				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (\*´д｀*)```')
+				await message.channel.send('```prolog\nHm... You don\'t have permission to use that (*´д｀*)```')
 			return
 
 		if self.voice_client:
 			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nI\'m busy playing some music now (\*´д｀*)```')
+				await message.channel.send('```prolog\nI\'m busy playing some music now (*´д｀*)```')
+				return
 
 		if not self.voice_client:
 			r = await self.cmd_join(message)
@@ -731,7 +666,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 				return
 		try:
 			if self.playing_songgame:
-				await message.channel.send("The game is currently being played. Enjoy!")
+				await message.channel.send('```css\nThe game is currently being played. Enjoy!```')
 				return
 		except AttributeError:
 			self.playing_songgame = True
@@ -751,7 +686,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 			return m.channel == message.channel
 
 		if round_num > 50:
-			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (\*´д｀*)```")
+			await message.channel.send("```prolog\nSorry. I can only hold up to 50 songs. Pls choose a smaller number (*´д｀*)```")
 			self.playing_songgame = False
 			return
 		
@@ -792,6 +727,8 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		await message.channel.send(f'```prolog\nDifficulty: {diff.capitalize()}\nLength: {duration} seconds\nNumber of rounds: {round_num}```\nGame starts in 5 seconds. Be ready!')
 		checktimeout = False
 		logger.debug("Game called at %s" % int(time.time()))
+
+		await asyncio.sleep(5)
 		
 		game = discord.Game('Song Game with friends')
 		await self.change_presence(activity=game)

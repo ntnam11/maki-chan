@@ -1,6 +1,12 @@
-import discord
 import logging
+import os
+import time
 from functools import wraps
+from urllib.parse import quote, unquote
+
+import discord
+import requests
+from bs4 import BeautifulSoup
 
 logger = logging.getLogger('root.common')
 
@@ -71,6 +77,115 @@ def owner_only(func):
         if str(message.author.id) == str(self.owner_id):
             await func(self, message, *args)
         else:
-            await message.channel.send('```autohotkey\nSorry. You do not have enough permissions to call this command (´･ω･`)```')
+            await message.channel.send('```fix\nSorry. You do not have enough permissions to call this command (´･ω･`)```')
 
     return target_func
+
+def create_song_list():
+	resource_url = 'https://love-live.fandom.com/wiki/Songs_BPM_List'
+	r = requests.get(resource_url)
+
+	soup = BeautifulSoup(r.content, 'html5lib')
+	
+	tables = soup.find_all('table', {'class': 'wikitable'})		
+	songs_available = []
+	for table in tables:
+		songs = table.find_all('a')
+		song_urls = []
+
+		for song in songs:
+			song_urls.append('https://love-live.fandom.com' + song.attrs['href'])
+		
+		songs_available.extend(song_urls)
+
+	with open(os.path.join('game_cache', 'song_additional')) as f:
+		content = f.readlines()
+
+	for line in content:
+		l = line.strip()
+		if l != '':
+			songs_available.append(l)
+
+	songs_available = list(set(songs_available))
+	
+	with open(os.path.join('game_cache', 'song_list'), mode='w+') as f:
+		f.write('\n'.join(songs_available))
+
+	return songs_available
+
+async def get_song_url(client, message, query):
+	song_list = os.path.join('game_cache', 'song_list')
+	if not os.path.exists(song_list):
+		songs_available = create_song_list()
+	else:
+		with open(song_list, mode='r') as f:
+			songs_available = f.readlines()
+	
+	found = []
+	for song_url in songs_available:
+		url = song_url.strip()
+		qq = quote(query.replace(' ', '_')).lower()
+		if qq in url.replace('https://love-live.fandom.com/wiki/', '').lower():
+			found.append(url)
+
+	if len(found) == 0:
+		await message.channel.send('```prolog\nHm... I can\'t find this song in the database (´ヘ｀()```')
+		return ''
+	elif len(found) == 1:
+		return found[0]
+	elif len(found) > 30:
+		await message.channel.send('```prolog\nHm... I found too many results. Please be more specific (´ヘ｀()```')
+		return ''
+	else:
+		strfound = ''
+		for i, url in enumerate(found):
+			song_name = unquote(url).replace("https://love-live.fandom.com/wiki/", "").replace("_", " ")
+			strfound += f'{i}. {song_name}\n'
+		strfound += 'c. Cancel```'
+
+		await message.channel.send(f'I\'ve found {len(found)} songs contains **{query}**. Which one do you like?```prolog\n{strfound}')
+
+		def _cond(m):
+			return m.channel == message.channel and m.author == message.author
+
+		start = int(time.time())
+		checktimeout = False
+		while True:
+			if (int(time.time()) - start) >= 30:
+				checktimeout = True
+
+			try:
+				response_message = await client.wait_for('message', check=_cond, timeout=30)
+			except asyncio.TimeoutError:
+				response_message = None
+
+			if (checktimeout == True) or (not response_message):
+				await message.channel.send('```fix\nTimeout. Request aborted```')
+				return ''
+
+			resp = response_message.content.lower()
+
+			if (resp == 'c'):
+				await message.channel.send('```css\nOkay. Nevermind```')
+				return ''
+
+			if not resp.isdigit() or int(resp) not in range(0, len(found)):
+				await message.channel.send('```fix\nPlease type the correct number```')
+
+			else:
+				break
+
+		return found[int(resp)]
+
+def message_voice_filter(func):
+	@wraps(func)
+	async def target_func(self, message, *args, **kwargs):
+		author_voice_ch = message.author.voice
+		if author_voice_ch is not None:
+			author_voice_ch = author_voice_ch.channel
+		if message.author.id != self.owner_id and (not author_voice_ch or author_voice_ch != self.voice_channel):
+			await message.channel.send('```fix\nSorry. You aren\'t in the same voice channel with me (´･ω･`)```')
+		else:
+			await func(self, message, *args, **kwargs)
+
+	return target_func

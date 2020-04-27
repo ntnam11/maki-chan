@@ -6,8 +6,6 @@ import os
 import logging
 import time
 
-from urllib.parse import quote, unquote
-
 from bs4 import BeautifulSoup
 
 from .common import *
@@ -233,70 +231,6 @@ class LoveLive:
 		lyrics = poem.text.strip()
 		return lyrics
 
-	async def _get_song_url(self, message, query):
-		song_list = os.path.join('game_cache', 'song_list')
-		if not os.path.exists(song_list):
-			songs_available = self._create_song_list()
-		else:
-			with open(song_list, mode='r') as f:
-				songs_available = f.readlines()
-		
-		found = []
-		for song_url in songs_available:
-			url = song_url.strip()
-			qq = quote(query.replace(' ', '_')).lower()
-			if qq in url.replace('https://love-live.fandom.com/wiki/', '').lower():
-				found.append(url)
-
-		if len(found) == 0:
-			await message.channel.send('```prolog\nHm... I can\'t find this song in the database (´ヘ｀()```')
-			return ''
-		elif len(found) == 1:
-			return found[0]
-		elif len(found) > 30:
-			await message.channel.send('```prolog\nHm... I found too many results. Please be more specific (´ヘ｀()```')
-			return ''
-		else:
-			strfound = ''
-			for i, url in enumerate(found):
-				song_name = unquote(url).replace("https://love-live.fandom.com/wiki/", "").replace("_", " ")
-				strfound += f'{i}. {song_name}\n'
-			strfound += 'c. Cancel```'
-
-			await message.channel.send(f'I\'ve found {len(found)} songs contains **{query}**. Which one do you like?```prolog\n{strfound}')
-
-			def _cond(m):
-				return m.channel == message.channel and m.author == message.author
-
-			start = int(time.time())
-			checktimeout = False
-			while True:
-				if (int(time.time()) - start) >= 30:
-					checktimeout = True
-
-				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=30)
-				except asyncio.TimeoutError:
-					response_message = None
-
-				if (checktimeout == True) or (not response_message):
-					await message.channel.send('```fix\nTimeout. Request aborted```')
-					return ''
-
-				resp = response_message.content.lower()
-
-				if (resp == 'c'):
-					await message.channel.send('```css\nOkay. Nevermind```')
-					return ''
-
-				if not resp.isdigit() or int(resp) not in range(0, len(found)):
-					await message.channel.send('```fix\nPlease type the correct number```')
-
-				else:
-					break
-
-			return found[int(resp)]
-
 	async def cmd_lyrics(self, message, query, *args):
 		'''
 		Search for lyrics of a Love Live! song
@@ -325,7 +259,7 @@ class LoveLive:
 		else:
 			q = ' '.join([query, *args])
 
-		url = await self._get_song_url(message, q)
+		url = await get_song_url(self, message, q)
 
 		if url == '':
 			return
@@ -345,7 +279,7 @@ class LoveLive:
 		'''
 		q = ' '.join([query, *args])
 		
-		url = await self._get_song_url(message, q)
+		url = await get_song_url(self, message, q)
 
 		if url == '':
 			return

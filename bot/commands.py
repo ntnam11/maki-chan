@@ -343,7 +343,7 @@ class Commands(Music, Games, LoveLive, Misc):
 				return
 		except ValueError:
 			await message.channel.send('```Invalid server ID```')
-		await message.channel.send('```prolog\nI\'m not in that server (\*´д｀*)```')
+		await message.channel.send('```prolog\nI\'m not in that server (*´д｀*)```')
 
 	@owner_only
 	async def cmd_config(self, message, key, value, *args):

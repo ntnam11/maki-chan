@@ -1,5 +1,13 @@
 # Changelogs
 
+## [0.3.2] - 2020-04-28
+### Added
+- skip voting
+#### New Commands
+- `request`
+### Modified
+- moved some modules to common
+
 ## [0.3.1] - 2020-04-23
 ### Added
 #### New Commands
