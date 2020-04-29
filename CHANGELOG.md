@@ -1,5 +1,14 @@
 # Changelogs
 
+## [0.3.3] - 2020-04-30
+### Added
+#### New Commands
+- `info`
+### Modified
+- changes to skip voting (depends on not self-deafen members)
+- changes to request command (only 1 can be made each 15 mins)
+- changed requests to aiohttp for non-blocking reason
+
 ## [0.3.2] - 2020-04-28
 ### Added
 - skip voting

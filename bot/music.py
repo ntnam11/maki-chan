@@ -5,9 +5,9 @@ import aiohttp
 import asyncio
 import logging
 import random
-import requests
 import re
 import time
+import datetime
 
 from bs4 import BeautifulSoup
 
@@ -80,6 +80,7 @@ class Song:
 class MusicPlayer:
 	def __init__(self):
 		self.music_queue = []
+		self.radio_requests = {}
 
 	async def _youtube_search(self, query, **kwargs):
 		url = 'https://www.googleapis.com/youtube/v3/search'
@@ -264,9 +265,10 @@ class Music(MusicPlayer):
 		if not self.voice_client and not self.voice_channel:
 			# await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
 			return
-		if self.voice_client.is_playing():
-			self.voice_client.stop()
-		await self.voice_client.disconnect()
+		if self.voice_client:
+			if self.voice_client.is_playing():
+				self.voice_client.stop()
+			await self.voice_client.disconnect()
 		if message:
 			await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
 		self.voice_channel = None
@@ -275,6 +277,7 @@ class Music(MusicPlayer):
 		self.force_stop_radio = False
 		self.radio_cache = []
 		self.force_stop_music = False
+		self.radio_requests = {}
 
 	@message_voice_filter
 	async def cmd_play(self, message, query, *args):
@@ -397,6 +400,7 @@ class Music(MusicPlayer):
 	async def cmd_skip(self, message, *args):
 		'''
 		Skip current playing song in voice channel
+		If there are more than 2 members in the same voice channel, a skip voting system will be used
 		Command group: Music
 		Usage: {command_prefix}skip
 		Example: {command_prefix}skip
@@ -406,18 +410,20 @@ class Music(MusicPlayer):
 			return
 
 		if self.voice_channel is not None:
-			member_count = len(self.voice_channel.members)
+			member_count = 0
+
+			for mem in self.voice_channel.members:
+				if not mem.voice.self_deaf:
+					member_count += 1
+
 			if member_count > 2:
-				votes_needed = int(member_count / 2) + 1
-				m = await message.channel.send(f'```css\nSkip requested. React with ➕ to skip this song ({votes_needed + 1} needed)```')
+				votes_needed = min(3, int(member_count / 2) + 1)
+				m = await message.channel.send(f'```css\nSkip requested. React with ➕ to skip this song ({votes_needed} needed)```')
 				await m.add_reaction('➕')
 				
 				msg_check_id = m.id
 
 				start_time = time.time()
-				
-				def _check(reaction, user):
-					return str(reaction.emoji) == '➕' and user in self.voice_channel.members
 				
 				skip = False
 
@@ -427,12 +433,14 @@ class Music(MusicPlayer):
 					if int(time.time() - start_time) > 10:
 						break
 
-					try:
-						if m.reactions[0].count > votes_needed:
-							skip = True
-							break
-					except IndexError:
-						pass
+					reaction_count = 0
+					async for user in m.reactions[0].users():
+						if user in self.voice_channel.members:
+							reaction_count += 1
+
+					if reaction_count >= votes_needed:
+						skip = True
+						break
 
 					time.sleep(.5)
 
@@ -574,63 +582,72 @@ class Music(MusicPlayer):
 
 		self.check_sleep(message)
 
+		if len(self.voice_channel.members) == 1:
+			await message.channel.send('```fix\nIt seems no one is listening to me. I\'m leaving ┐(‘～`；)┌``')
+			if self.voice_client.is_connected():
+				if self.voice_client.is_playing():
+					self.voice_client.stop()
+				await self.voice_client.disconnect()
+			await self.cmd_leave()
+			return
+
 		song_info = None
 
-		while True:
-			if len(self.music_queue) > 0:
-				song_info = self.music_queue.pop()
-				break
-			else:
-				song_url = random.choice(songs_available)
-				if song_url in self.radio_cache:
-					continue
+		async with aiohttp.ClientSession() as session:
+			while True:
+				if len(self.music_queue) > 0:
+					song_info = self.music_queue.pop()
+					break
 				else:
-					self.radio_cache.append(song_url)
+					song_url = random.choice(songs_available)
+					if song_url in self.radio_cache:
+						continue
+					else:
+						self.radio_cache.append(song_url)
 
-			r = requests.get(song_url.strip())
-			soup =  BeautifulSoup(r.content, 'html5lib')
+				async with session.get(song_url.strip()) as r:
+					soup =  BeautifulSoup(await r.read(), 'html5lib')
 
-			song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
-			song_files = soup.find_all('div', {'class': 'ogg_player'})
-			song_file = random.choice(song_files)
+				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+				song_files = soup.find_all('div', {'class': 'ogg_player'})
+				song_file = random.choice(song_files)
 
-			for p in song_file.parents:
-				if p.name == 'td':
-					td = p
+				for p in song_file.parents:
+					if p.name == 'td':
+						td = p
+						break
+
+				t = None
+
+				for p in song_file.parents:
+					if 'class' in p.attrs:
+						if 'tabbertab' in p.attrs['class']:
+							t = p
+							break
+					if 'id' in p.attrs:
+						if p.attrs['id'] == 'mw-content-text':
+							break
+
+				if t is None:
 					break
 
-			t = None
+				if t.attrs['title'].lower() != 'radio drama':
+					break
+			
+			if song_info is None:
+				song_length = td.previous_sibling
+				song_name = song_length.previous_sibling.text.strip()
 
-			for p in song_file.parents:
-				if 'class' in p.attrs:
-					if 'tabbertab' in p.attrs['class']:
-						t = p
-						break
-				if 'id' in p.attrs:
-					if p.attrs['id'] == 'mw-content-text':
-						break
+				song_onclick = song_file.find('button').attrs['onclick']
+				song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
 
-			if t is None:
-				break
+			else:
+				song_name = song_info.title
+				song_url = song_info.url
 
-			if t.attrs['title'].lower() != 'radio drama':
-				break
-		
-		if song_info is None:
-			song_length = td.previous_sibling
-			song_name = song_length.previous_sibling.text.strip()
-
-			song_onclick = song_file.find('button').attrs['onclick']
-			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
-
-		else:
-			song_name = song_info.title
-			song_url = song_info.url
-
-		song_r = requests.get(song_url)
-		song_data = song_r.content
-		with open(os.path.join('game_cache', 'radio.ogg'), mode='wb+') as f:
-			f.write(song_data)
+			async with session.get(song_url) as r:
+				with open(os.path.join('game_cache', 'radio.ogg'), mode='wb+') as f:
+					f.write(await r.read())
 
 		game = discord.Game(song_name)
 		await self.change_presence(activity=game)
@@ -658,6 +675,7 @@ class Music(MusicPlayer):
 	async def cmd_request(self, message, query, *args):
 		'''
 		Request a song on Love Live! radio (including Sunshine, Nijigasaki & Saint Snow)
+		If there are more than 2 non-self-deafened members, only 1 request can be made each 15 minutes
 		Command group: Music
 		Usage:
 			{command_prefix}request [song_name] (idol/off vocal/mix name)
@@ -667,6 +685,22 @@ class Music(MusicPlayer):
 			{command_prefix}request spicaterrible (off vocal)
 			{command_prefix}request aishiteru banzai (prepro piano mix)
 		'''
+		if message.author.id in self.radio_requests:
+			last_request = self.radio_requests[message.author.id]
+			if self.voice_channel:
+				
+				member_count = 0
+
+				for mem in self.voice_channel.members:
+					if not mem.voice.self_deaf:
+						member_count += 1
+
+				if member_count > 2:
+					if time.time() - last_request < 900:
+						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(minutes=15)
+						await message.channel.send(f'```fix\nSorry. You can only request a song every 15 minutes. Your next request available at {next_request.strftime("%Y-%m-%d %H:%M:%S")}```')
+						return
+
 		q = ' '.join([query, *args]).lower()
 		singer = ''
 		off_vocal = False
@@ -685,9 +719,11 @@ class Music(MusicPlayer):
 		url = await get_song_url(self, message, q.strip())
 		if url == '':
 			return
-		
-		r = requests.get(url)
-		soup = BeautifulSoup(r.content, 'html5lib')
+
+		async with aiohttp.ClientSession() as session:
+			async with session.get(url) as r:
+				soup = BeautifulSoup(await r.read(), 'html5lib')
+
 		song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
 
 		song_files = soup.find_all('div', {'class': 'ogg_player'})
@@ -745,6 +781,8 @@ class Music(MusicPlayer):
 			return
 
 		self.music_queue.append(song_info)
+
+		self.radio_requests[message.author.id] = time.time()
 
 		if not self.playing_radio:
 			await self.cmd_llradio(message)

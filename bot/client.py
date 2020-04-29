@@ -41,6 +41,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		self.music_loop = False
 		self.force_stop_music = False
 		self.radio_cache = []
+		self.radio_requests = {}
 		self.scouting = False
 		self.music_cache_dir = os.path.join(os.getcwd(), 'audio_cache')
 		self.last_status_timestamp = datetime.datetime.utcnow() - datetime.timedelta(minutes=10)
@@ -195,6 +196,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 			self.owner_id = os.environ['OWNER_ID']
 
 	def on_ready(self):
+		delattr(self, 'token')
 		logger.info('Logged on as %s' % (self.user))
 		logger.info('Set Prefix: %s' % self.prefix)
 		logger.info('Connected to:')

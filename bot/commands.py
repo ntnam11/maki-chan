@@ -1,30 +1,33 @@
-import re
-import aiohttp
-import logging
-import time
-import tempfile
 import asyncio
-import random
-import urllib
+import datetime
 import io
-import shutil
-import traceback
+import logging
 import os
+import random
+import re
+import shutil
+import tempfile
+import platform
+import time
+import traceback
+import urllib
+from textwrap import dedent
+from threading import Timer
+
+import aiohttp
+import discord
+import psutil
 import requests
 import yaml
-
-from threading import Timer
-from textwrap import dedent
-
-import discord
-from PIL import Image
 from bs4 import BeautifulSoup
-from .music import Music
+from PIL import Image
+
+from .common import *
+from .exceptions import *
 from .games import Games
 from .lovelive import LoveLive
 from .misc import Misc
-from .exceptions import *
-from .common import *
+from .music import Music
 
 logger = logging.getLogger('root.commands')
 
@@ -236,6 +239,8 @@ class Commands(Music, Games, LoveLive, Misc):
 		self.force_stop_music = False
 		self.music_loop = False
 		self.scouting = False
+		self.radio_cache = []
+		self.radio_requests = {}
 
 		await message.channel.send('```css\nDone```')
 		
@@ -289,7 +294,7 @@ class Commands(Music, Games, LoveLive, Misc):
 		except Exception as e:
 			cmd_result = repr(e)
 		result = '```python\n%s```' % (cmd_result)
-		await send_long_message(message.channel, result, prefix='```python', suffix='```')
+		await send_long_message(message.channel, result, prefix='```python\n', suffix='```')
 
 	@owner_only
 	async def cmd_message(self, message, uid, content, *args):
@@ -447,3 +452,36 @@ class Commands(Music, Games, LoveLive, Misc):
 		'''
 		game = discord.Game(' '.join([status_text, *args]))
 		await self.change_presence(activity=game)
+
+	async def cmd_info(self, message, *args):
+		'''
+		Show bot's debug information
+		Command group: Owner only
+		Usage:
+			{command_prefix}info
+		Example:
+			{command_prefix}info
+		'''
+		psutil.cpu_percent(interval=None)
+		embed = discord.Embed()
+
+		cpu_time = str(datetime.timedelta(seconds=time.time() - psutil.boot_time()))
+		mem = psutil.virtual_memory()
+		await asyncio.sleep(1)
+		cpu_percent = psutil.cpu_percent(interval=None)
+
+		version = discord.version_info
+		version = f'v{version.major}.{version.minor}.{version.micro} ({version.releaselevel})'
+
+		embed.add_field(name='Platform', value=platform.platform())
+		embed.add_field(name='Python', value=f'v{platform.python_version()}')
+		embed.add_field(name='Discord', value=version)
+		embed.add_field(name='Uptime', value=cpu_time, inline=False)
+		embed.add_field(name='%CPU', value=cpu_percent)
+		embed.add_field(name='RAM', value=f'{mem.used >> 20}/{mem.total >> 20}')
+		embed.add_field(name='%RAM', value=cpu_percent)
+		embed.add_field(name='Guilds', value=len(self.guilds))
+		embed.add_field(name='Users', value=len(self.users))
+		embed.add_field(name='Latency', value=f'{round(self.latency * 100)/100}s')
+
+		await message.channel.send(embed=embed)

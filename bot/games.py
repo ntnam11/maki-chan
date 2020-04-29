@@ -7,8 +7,6 @@ import shutil
 import tempfile
 import time
 import urllib.parse
-import urllib.request
-import requests
 import re
 import gc
 import subprocess
@@ -209,16 +207,16 @@ class Games:
 
 			async with message.channel.typing():
 				retries = 0
-				while True:
-					try:
-						network_timeout = 0
-						while network_timeout < 5:
-							random_num = random.randint(1, card_max)
-							url = f'https://schoolido.lu/api/cards/{random_num}'
-							if all_stars:
-								url = 'https://idol.st/allstars/cards/random/'
-							logger.debug(f'Searched {url}')
-							async with aiohttp.ClientSession() as session:
+				async with aiohttp.ClientSession() as session:
+					while True:
+						try:
+							network_timeout = 0
+							while network_timeout < 5:
+								random_num = random.randint(1, card_max)
+								url = f'https://schoolido.lu/api/cards/{random_num}'
+								if all_stars:
+									url = 'https://idol.st/allstars/cards/random/'
+								logger.debug(f'Searched {url}')
 								async with session.get(url) as r:
 									if r.status == 404:
 										card_max = card_max / 2
@@ -257,56 +255,51 @@ class Games:
 										network_timeout += 1
 										time.sleep(3)
 						
-						if network_timeout == 5:
-							await message.channel.send('```Something wrong with the API server. Please contact bot owner / try again later```')
-							self.playing_cardgame = False
-							return
+							if network_timeout == 5:
+								await message.channel.send('```Something wrong with the API server. Please contact bot owner / try again later```')
+								self.playing_cardgame = False
+								return
 
-						if not all_stars:
-							fd = urllib.request.urlopen(img)
-							image_file = io.BytesIO(fd.read())
+							async with session.get(img) as r:
+								image_file = io.BytesIO(await r.read())
+							im = Image.open(image_file)
+							path = "%s/%s.png" % (dirpath, selected_card)
+							im.save(path)
+
+							if all_stars:
+								zoom = 640 / 1800
+								rarity_x_start = {
+									'rare': 500,
+									'super rare': 0,
+									'ultra rare': 0
+								}
+								rarity_x_end = {
+									'rare': 1300,
+									'super rare': 1800,
+									'ultra rare': 1800
+								}
+								x_range = [int(rarity_x_start[rarity.lower()] * zoom), int(rarity_x_end[rarity.lower()] * zoom - diff_size[diff])]
+								y_range = [0, int(900 * zoom - diff_size[diff])]
+							x = random.randint(*x_range)
+							y = random.randint(*y_range)
+							area = (x, y, x+diff_size[diff], y+diff_size[diff])
+							cropped_img = im.crop(area)
+
+							temp_path = f'{dirpath}/{selected_card}_cropped.png'
+							cropped_img.save(temp_path)
+						except OSError:
+							logger.error('Error occurred. Continue searching')
+							retries += 1
+							if retries == 5:
+								raise
+							pass
 						else:
-							r = requests.get(img)
-							image_file = io.BytesIO(r.content)
-						im = Image.open(image_file)
-						path = "%s/%s.png" % (dirpath, selected_card)
-						im.save(path)
+							break
 
-						#Crop image and send
-						if all_stars:
-							zoom = 640 / 1800
-							rarity_x_start = {
-								'rare': 500,
-								'super rare': 0,
-								'ultra rare': 0
-							}
-							rarity_x_end = {
-								'rare': 1300,
-								'super rare': 1800,
-								'ultra rare': 1800
-							}
-							x_range = [int(rarity_x_start[rarity.lower()] * zoom), int(rarity_x_end[rarity.lower()] * zoom - diff_size[diff])]
-							y_range = [0, int(900 * zoom - diff_size[diff])]
-						x = random.randint(*x_range)
-						y = random.randint(*y_range)
-						area = (x, y, x+diff_size[diff], y+diff_size[diff])
-						cropped_img = im.crop(area)
-
-						temp_path = "%s/%s_cropped.png" % (dirpath, selected_card)
-						cropped_img.save(temp_path)
-					except OSError:
-						logger.error('Error occurred. Continue searching')
-						retries += 1
-						if retries == 5:
-							raise
-						pass
-					else:
-						break
-
-				await message.channel.send("Question %d of %d. Guess who?" % (count + 1, card_num), file=discord.File(temp_path))
+				await message.channel.send(f'Question {count + 1} of {card_num}. Guess who?', file=discord.File(temp_path))
 
 			start = int(time.time())
-			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
+			logger.debug(f'Question {count + 1} at {int(time.time())}')
 			strresult = ""
 			while True:
 				if (int(time.time()) - start) >= 15:
@@ -316,28 +309,29 @@ class Games:
 				except asyncio.TimeoutError:
 					response_message = None
 				if (checktimeout == True) or (not response_message):
-					logger.debug("Time out.")
+					logger.debug(f'Timed out at {int(time.time())}')
 					checktimeout = False
-					await message.channel.send("Time out! Here's the answer:\n%s, Card No.%s" % (selected_idol, selected_card), file=discord.File(path))
+					await message.channel.send(f'Time out! Here\'s the answer:\n{selected_idol}, Card No.{selected_card}', file=discord.File(path))
 					break
 				answ = response_message.content.lower()
 				if (answ in SIF_NAME_LIST and (SIF_IDOL_NAMES[answ].lower() == selected_idol.lower())):
-					await message.channel.send("10 points for %s\n%s, Card No.%s" % (response_message.author.display_name, selected_idol, selected_card), file=discord.File(path))
+					await message.channel.send(f'10 points for {response_message.author.display_name}\n{selected_idol}, Card No.{selected_card}', file=discord.File(path))
 					if response_message.author.display_name not in userinfo:
 						userinfo[response_message.author.display_name] = 0
 					userinfo[response_message.author.display_name] += 10
 					for x in userinfo:
 						strresult += "%s: %s\n" % (x, userinfo[x])
-					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
+					await message.channel.send(f'Round {count + 1} result:\n```prolog\n{strresult}```')
 					time.sleep(2)
 					break
 				elif answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
 					stop = True
 					break
 				elif (answ in SIF_NAME_LIST):
-					await message.channel.send("%s is not correct. Try again." % answ)
+					await message.channel.send(f'{answ} is not correct. Try again.')
 			
 			if stop == True:
+				logger.debug(f'Game stopped at {int(time.time())}')
 				await message.channel.send("Ok. The game stopped!")
 				break
 
@@ -473,111 +467,113 @@ class Games:
 
 		stop = False
 
-		for count in range(0, round_num):
-			async with message.channel.typing():
-				song_url = random.choice(songs_available)
-				r = requests.get(song_url.strip())
-				soup =  BeautifulSoup(r.content, 'html5lib')
+		async with aiohttp.ClientSession() as session:
+			for count in range(0, round_num):
+				async with message.channel.typing():
+					song_url = random.choice(songs_available)
 
-				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+					async with session.get(song_url.strip()) as r:
+						soup =  BeautifulSoup(await r.read(), 'html5lib')
+		
+					song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
 
-				poem = soup.find_all('div', {'class': 'poem'})[0]
-				lyrics = poem.text.strip()
+					poem = soup.find_all('div', {'class': 'poem'})[0]
+					lyrics = poem.text.strip()
 
-				lines = list(filter(lambda f: f != '', lyrics.split('\n')))
+					lines = list(filter(lambda f: f != '', lyrics.split('\n')))
 
-				if diff in hard_diff:
-					start_line = random.randint(2, len(lines) - 7)
-				elif diff in normal_diff:
-					start_line = 0
+					if diff in hard_diff:
+						start_line = random.randint(2, len(lines) - 7)
+					elif diff in normal_diff:
+						start_line = 0
 
-				await message.channel.send("Question %d of %d:" % (count + 1, round_num))
+					await message.channel.send("Question %d of %d:" % (count + 1, round_num))
 
-			start = int(time.time())
-			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
-			strresult = ""
-			points = 12
-			lines = iter(lines[start_line:start_line + 5])
-			_lyrics = ''
-			hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
-			while True:
-				t = int(time.time()) - start
-				if t % 10 == 0:
-					points -= 2
-					_lyrics += '♬ %s ♬\n' % (next(lines))
-					await message.channel.send(_lyrics)
-				
-				elif t >= 45:
-					checktimeout = True
-				
-				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=15)
-				except asyncio.TimeoutError:
-					continue
-				
-				if (checktimeout == True):
-					logger.debug("Time out.")
-					checktimeout = False
-					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
-					break
-				answ = response_message.content.lower()
-				if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
-					stop = True
-					break
-				if answ == 'hint':
-					await message.channel.send('''```python
+				start = int(time.time())
+				logger.debug("Question %d at %s" % (count + 1, int(time.time())))
+				strresult = ""
+				points = 12
+				lines = iter(lines[start_line:start_line + 5])
+				_lyrics = ''
+				hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
+				while True:
+					t = int(time.time()) - start
+					if t % 10 == 0:
+						points -= 2
+						_lyrics += '♬ %s ♬\n' % (next(lines))
+						await message.channel.send(_lyrics)
+					
+					elif t >= 45:
+						checktimeout = True
+					
+					try:
+						response_message = await self.wait_for('message', check=_cond, timeout=15)
+					except asyncio.TimeoutError:
+						continue
+					
+					if (checktimeout == True):
+						logger.debug("Time out.")
+						checktimeout = False
+						await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
+						break
+					answ = response_message.content.lower()
+					if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
+						stop = True
+						break
+					if answ == 'hint':
+						await message.channel.send('''```python
 Hm... What hint will you choose?\n
 hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
 hint word (-3 points) - a random word of song name (e.g. Snow)
-					```''')
-				elif answ.startswith('hint '):
-					htype = answ.replace('hint ', '')
-					if htype == 'word':
-						_ = song_name.split(' ')
-						while True:
-							r = random.randint(0, len(_) - 1)
-							if _[r] not in hint_arr and r != '':
-								break
-						hint_arr[r] = song_name.split(' ')[r]
-						await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
-						subtract_points = 3
-					if htype == 'letter':
-						for i, e in enumerate(hint_arr):
-							if '-' not in e:
-								continue
-							r = random.randint(0, len(e) - 1)
-							if e[r] != '-':
-								continue
-							c = song_name.split(' ')[i][r] 
-							try:
-								s = e[:r] + c + e[r + 1:]
-							except IndexError:
-								s = e[:r] + c
-							hint_arr[i] = s
-						await message.channel.send(f'Letter hint for u: {" ".join(hint_arr)}')
-						subtract_points = 2
-					if response_message.author.display_name not in userinfo:
-						userinfo[response_message.author.display_name] = 0
-					userinfo[response_message.author.display_name] -= subtract_points
-				if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
-					await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
-					if response_message.author.display_name not in userinfo:
-						userinfo[response_message.author.display_name] = 0
-					userinfo[response_message.author.display_name] += points
+						```''')
+					elif answ.startswith('hint '):
+						htype = answ.replace('hint ', '')
+						if htype == 'word':
+							_ = song_name.split(' ')
+							while True:
+								r = random.randint(0, len(_) - 1)
+								if _[r] not in hint_arr and r != '':
+									break
+							hint_arr[r] = song_name.split(' ')[r]
+							await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
+							subtract_points = 3
+						if htype == 'letter':
+							for i, e in enumerate(hint_arr):
+								if '-' not in e:
+									continue
+								r = random.randint(0, len(e) - 1)
+								if e[r] != '-':
+									continue
+								c = song_name.split(' ')[i][r] 
+								try:
+									s = e[:r] + c + e[r + 1:]
+								except IndexError:
+									s = e[:r] + c
+								hint_arr[i] = s
+							await message.channel.send(f'Letter hint for u: {" ".join(hint_arr)}')
+							subtract_points = 2
+						if response_message.author.display_name not in userinfo:
+							userinfo[response_message.author.display_name] = 0
+						userinfo[response_message.author.display_name] -= subtract_points
+					if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
+						await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
+						if response_message.author.display_name not in userinfo:
+							userinfo[response_message.author.display_name] = 0
+						userinfo[response_message.author.display_name] += points
 
-					for x in userinfo:
-						strresult += "%s: %s\n" % (x, userinfo[x])
-					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
-					time.sleep(2)
+						for x in userinfo:
+							strresult += "%s: %s\n" % (x, userinfo[x])
+						await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
+						time.sleep(2)
+						break
+
+				if stop == True:
+					await message.channel.send("Ok. The game stopped!")
 					break
 
-			if stop == True:
-				await message.channel.send("Ok. The game stopped!")
-				break
-
-			if count + 1 != round_num:
-				await message.channel.send("Here comes the next question!")
-			time.sleep(1)
+				if count + 1 != round_num:
+					await message.channel.send("Here comes the next question!")
+				time.sleep(1)
 
 		strresult = ""
 		sorted_name = [v[0] for v in sorted(userinfo.items(), key=lambda kv: (-kv[1], kv[0]))]
@@ -741,150 +737,153 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 
 		cached = []
 
-		for count in range(0, round_num):
-			await message.channel.send(f'Preparing question {count + 1} of {round_num}...')
-			
-			while True:
-				song_url = random.choice(songs_available)
-				if song_url in cached:
-					continue
-				else:
-					cached.append(song_url)
-				r = requests.get(song_url.strip())
-				soup =  BeautifulSoup(r.content, 'html5lib')
+		async with aiohttp.ClientSession() as session:
+			for count in range(0, round_num):
+				await message.channel.send(f'Preparing question {count + 1} of {round_num}...')
+				
+				while True:
+					song_url = random.choice(songs_available)
+					if song_url in cached:
+						continue
+					else:
+						cached.append(song_url)
+						
+					async with session.get(song_url.strip()) as r:
+						soup =  BeautifulSoup(await r.read(), 'html5lib')
 
-				song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
-				song_files = soup.find_all('div', {'class': 'ogg_player'})
-				song_file = random.choice(song_files)
+					song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
+					song_files = soup.find_all('div', {'class': 'ogg_player'})
+					song_file = random.choice(song_files)
 
-				for p in song_file.parents:
-					if p.name == 'td':
-						td = p
-						break
-
-				t = None
-
-				for p in song_file.parents:
-					if 'class' in p.attrs:
-						if 'tabbertab' in p.attrs['class']:
-							t = p
-							break
-					if 'id' in p.attrs:
-						if p.attrs['id'] == 'mw-content-text':
+					for p in song_file.parents:
+						if p.name == 'td':
+							td = p
 							break
 
-				if t is None:
-					break
+					t = None
 
-				if t.attrs['title'].lower() != 'radio drama':
+					for p in song_file.parents:
+						if 'class' in p.attrs:
+							if 'tabbertab' in p.attrs['class']:
+								t = p
+								break
+						if 'id' in p.attrs:
+							if p.attrs['id'] == 'mw-content-text':
+								break
+
+					if t is None:
 						break
 
-			song_length = td.previous_sibling.text.strip()
-			seconds = int(song_length[-2:])
-			minutes = int(song_length[:-3])
-			total_seconds = minutes * 60 + seconds
+					if t.attrs['title'].lower() != 'radio drama':
+							break
 
-			song_onclick = song_file.find('button').attrs['onclick']
-			song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
+				song_length = td.previous_sibling.text.strip()
+				seconds = int(song_length[-2:])
+				minutes = int(song_length[:-3])
+				total_seconds = minutes * 60 + seconds
 
-			song_r = requests.get(song_url.strip())
-			song_data = song_r.content
-			file_name = ''.join(e for e in song_name if e.isalnum())
-			with open(os.path.join(song_cache, file_name + '.ogg'), mode='wb+') as f:
-				f.write(song_data)
+				song_onclick = song_file.find('button').attrs['onclick']
+				song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
 
-			time_start = random.randint(0, total_seconds - duration)
+				async with session.get(song_url.strip()) as r:
+					song_data = await r.read()
 
-			subprocess.run(['ffmpeg', '-i', os.path.join(song_cache, file_name + '.ogg'), '-ss', str(time_start), '-to', str(time_start + duration), '-c', 'copy', os.path.join(song_cache, 'file.ogg'), '-y'])
+				file_name = ''.join(e for e in song_name if e.isalnum())
+				with open(os.path.join(song_cache, file_name + '.ogg'), mode='wb+') as f:
+					f.write(song_data)
 
-			# source = discord.PCMAudio(io.BytesIO(song_data))
-			source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), song_cache, 'file.ogg'), executable='ffmpeg')
+				time_start = random.randint(0, total_seconds - duration)
 
-			await message.channel.send('What is this song?')
-			
-			self.voice_client.play(source)
-			
-			start = int(time.time())
-			logger.debug("Question %d at %s" % (count + 1, int(time.time())))
-			strresult = ""
-			points = 10
-			hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
-			while True:
-				t = int(time.time()) - start
-				if t >= 45:
-					checktimeout = True
+				subprocess.run(['ffmpeg', '-i', os.path.join(song_cache, file_name + '.ogg'), '-ss', str(time_start), '-to', str(time_start + duration), '-c', 'copy', os.path.join(song_cache, 'file.ogg'), '-y'])
+
+				# source = discord.PCMAudio(io.BytesIO(song_data))
+				source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), song_cache, 'file.ogg'), executable='ffmpeg')
+
+				await message.channel.send('What is this song?')
 				
-				try:
-					response_message = await self.wait_for('message', check=_cond, timeout=45)
-				except asyncio.TimeoutError:
-					checktimeout = True
+				self.voice_client.play(source)
 				
-				if (checktimeout == True):
-					logger.debug("Time out.")
-					checktimeout = False
-					await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
-					break
-				answ = response_message.content.lower()
-				if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
-					stop = True
-					break
-				if answ == 'hint':
-					await message.channel.send('''```python
+				start = int(time.time())
+				logger.debug("Question %d at %s" % (count + 1, int(time.time())))
+				strresult = ""
+				points = 10
+				hint_arr = list(map(lambda x: ''.join(['-' for y in x]), song_name.split(' ')))
+				while True:
+					t = int(time.time()) - start
+					if t >= 45:
+						checktimeout = True
+					
+					try:
+						response_message = await self.wait_for('message', check=_cond, timeout=45)
+					except asyncio.TimeoutError:
+						checktimeout = True
+					
+					if (checktimeout == True):
+						logger.debug("Time out.")
+						checktimeout = False
+						await message.channel.send("Time out! Here's the answer: **%s**" % (song_name))
+						break
+					answ = response_message.content.lower()
+					if answ == "stop" and (response_message.author == user1st or self.check_owner(response_message)):
+						stop = True
+						break
+					if answ == 'hint':
+						await message.channel.send('''```python
 Hm... What hint will you choose?\n
 hint letter (-2 points) - a random letter in every word of song name (e.g. -N-- H-------) \n
 hint word (-3 points) - a random word of song name (e.g. Snow)
-					```''')
-				elif answ.startswith('hint '):
-					htype = answ.replace('hint ', '')
-					if htype == 'word':
-						_ = song_name.split(' ')
-						while True:
-							r = random.randint(0, len(_) - 1)
-							if _[r] not in hint_arr and r != '':
-								break
-						hint_arr[r] = song_name.split(' ')[r]
-						await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
-						subtract_points = 3
-					if htype == 'letter':
-						for i, e in enumerate(hint_arr):
-							if '-' not in e:
-								continue
-							r = random.randint(0, len(e) - 1)
-							if e[r] != '-':
-								continue
-							c = song_name.split(' ')[i][r] 
-							try:
-								s = e[:r] + c + e[r + 1:]
-							except IndexError:
-								s = e[:r] + c
-							hint_arr[i] = s
-						await message.channel.send(f'Letter hint for u: {" ".join(hint_arr)}')
-						subtract_points = 2
-					if response_message.author.display_name not in userinfo:
-						userinfo[response_message.author.display_name] = 0
-					userinfo[response_message.author.display_name] -= subtract_points
-				if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
-					await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
-					if response_message.author.display_name not in userinfo:
-						userinfo[response_message.author.display_name] = 0
-					userinfo[response_message.author.display_name] += points
+						```''')
+					elif answ.startswith('hint '):
+						htype = answ.replace('hint ', '')
+						if htype == 'word':
+							_ = song_name.split(' ')
+							while True:
+								r = random.randint(0, len(_) - 1)
+								if _[r] not in hint_arr and r != '':
+									break
+							hint_arr[r] = song_name.split(' ')[r]
+							await message.channel.send(f'Word hint for u: {" ".join(hint_arr)}')
+							subtract_points = 3
+						if htype == 'letter':
+							for i, e in enumerate(hint_arr):
+								if '-' not in e:
+									continue
+								r = random.randint(0, len(e) - 1)
+								if e[r] != '-':
+									continue
+								c = song_name.split(' ')[i][r] 
+								try:
+									s = e[:r] + c + e[r + 1:]
+								except IndexError:
+									s = e[:r] + c
+								hint_arr[i] = s
+							await message.channel.send(f'Letter hint for u: {" ".join(hint_arr)}')
+							subtract_points = 2
+						if response_message.author.display_name not in userinfo:
+							userinfo[response_message.author.display_name] = 0
+						userinfo[response_message.author.display_name] -= subtract_points
+					if normalize_text(answ.strip()) == normalize_text(song_name.strip()):
+						await message.channel.send("That's right! %s.\n%s points for %s" % (song_name, points, response_message.author.display_name))
+						if response_message.author.display_name not in userinfo:
+							userinfo[response_message.author.display_name] = 0
+						userinfo[response_message.author.display_name] += points
 
-					for x in userinfo:
-						strresult += "%s: %s\n" % (x, userinfo[x])
-					await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
-					time.sleep(2)
+						for x in userinfo:
+							strresult += "%s: %s\n" % (x, userinfo[x])
+						await message.channel.send("Round %d result:\n```prolog\n%s```" % (count + 1, strresult))
+						time.sleep(2)
+						break
+
+				if stop == True:
+					await message.channel.send("Ok. The game stopped!")
 					break
+				
+				if self.voice_client.is_playing():
+					self.voice_client.stop()
 
-			if stop == True:
-				await message.channel.send("Ok. The game stopped!")
-				break
-			
-			if self.voice_client.is_playing():
-				self.voice_client.stop()
-
-			if count + 1 != round_num:
-				await message.channel.send("Here comes the next question!")
-			time.sleep(1)
+				if count + 1 != round_num:
+					await message.channel.send("Here comes the next question!")
+				time.sleep(1)
 
 		strresult = ""
 		sorted_name = [v[0] for v in sorted(userinfo.items(), key=lambda kv: (-kv[1], kv[0]))]
@@ -1051,54 +1050,56 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 					url = "https://schoolido.lu/api/cards/%s/" % x	
 					async with session.get(url) as r:
 						js = await r.json()
-						card_name = js['idol']['name']
-						card_rarity = js['rarity']
-						card_id = js['id']
-						card_set = js['translated_collection']
-						card_date = js['release_date']
-						card_attrb = js['attribute']
-						card_skill = js['skill']
-						card_hp = js['hp']
-						if scout_idlz == False:
-							card_img = 'https:%s' % (js['card_image'])
-						else:
-							card_img = 'https:%s' % (js['card_idolized_image'])
 
-						current_result += f'#{card_id} {card_rarity} {card_name} '
-						if str(card_set).lower() != "none":
-							current_result += f'[{card_set}, {card_date}] '
+					card_name = js['idol']['name']
+					card_rarity = js['rarity']
+					card_id = js['id']
+					card_set = js['translated_collection']
+					card_date = js['release_date']
+					card_attrb = js['attribute']
+					card_skill = js['skill']
+					card_hp = js['hp']
+					if scout_idlz == False:
+						card_img = 'https:%s' % (js['card_image'])
+					else:
+						card_img = 'https:%s' % (js['card_idolized_image'])
+
+					current_result += f'#{card_id} {card_rarity} {card_name} '
+					if str(card_set).lower() != "none":
+						current_result += f'[{card_set}, {card_date}] '
+					else:
+						current_result += f'[{card_date}] '
+					current_result += f'({card_attrb}, {card_skill}, HP: {card_hp})\n'
+					
+					if scout_num == 11:
+						try:
+							round_card_img = f"https:{js['round_card_image']}"
+							if round_card_img is None or scout_idlz:
+								raise KeyError
+						except KeyError:
+							round_card_img = f"https:{js['round_card_idolized_image']}"
+					
+						path = os.path.join('game_cache', 'scout', f'{x}.png')
+						if os.path.exists(path):
+							pass
 						else:
-							current_result += f'[{card_date}] '
-						current_result += f'({card_attrb}, {card_skill}, HP: {card_hp})\n'
-						
-						if scout_num == 11:
-							try:
-								round_card_img = f"https:{js['round_card_image']}"
-								if round_card_img is None or scout_idlz:
-									raise KeyError
-							except KeyError:
-								round_card_img = f"https:{js['round_card_idolized_image']}"
-						
-							path = os.path.join('game_cache', 'scout', f'{x}.png')
-							if os.path.exists(path):
-								pass
-							else:
-								r = requests.get(round_card_img)
+							async with session.get(round_card_img) as r:
 								with open(path, mode='wb+') as f:
-									f.write(r.content)
-							im = Image.open(path).convert('RGBA')
-							if i <= 5:
-								offset = (159 + i * 160, 70)
-							else:
-								offset = (239 + (i - 6) * 160, 260)
-							scout_11_bg_im.paste(im, offset, im)
-						
-						if scout_num == 1:
-							embed = discord.Embed()
-							embed.set_image(url=card_img)
-							kwargs = {
-								'embed': embed
-							}
+									f.write(await r.read())
+
+						im = Image.open(path).convert('RGBA')
+						if i <= 5:
+							offset = (159 + i * 160, 70)
+						else:
+							offset = (239 + (i - 6) * 160, 260)
+						scout_11_bg_im.paste(im, offset, im)
+					
+					if scout_num == 1:
+						embed = discord.Embed()
+						embed.set_image(url=card_img)
+						kwargs = {
+							'embed': embed
+						}
 
 			if scout_num == 11:
 				path = os.path.join('game_cache', 'scout.jpg')

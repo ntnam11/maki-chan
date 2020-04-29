@@ -48,38 +48,38 @@ SIF_COLOR_LIST = {
 }
 
 async def delete_message(message):
-    try:
-        await message.delete()
-    except discord.Forbidden:
-        logger.error('Delete message failed due to no permission')
-        pass
+	try:
+		await message.delete()
+	except discord.Forbidden:
+		logger.error('Delete message failed due to no permission')
+		pass
 
 async def send_long_message(channel, message, prefix='', suffix='', sep=' '):
-    l = int(len(message) / 2)
-    try:
-        await channel.send(message)
-    except discord.errors.HTTPException:
-        found = False
-        for i, e in enumerate(message[l:]):
-            if e == sep:
-                found = True
-                break
-        if not found:
-            i = l
-        else:
-            i += l
-        await channel.send(message[:i] + suffix)
-        await channel.send(prefix + message[i:])
+	l = int(len(message) / 2)
+	if len(message + prefix + suffix + sep) < 2000:
+		await channel.send(message)
+	else:
+		found = False
+		for i, e in enumerate(message[l:]):
+			if e == sep:
+				found = True
+				break
+		if not found:
+			i = l
+		else:
+			i += l
+		await send_long_message(channel, message[:i] + suffix, prefix=prefix, suffix=suffix, sep=sep)
+		await send_long_message(channel, prefix + message[i:], prefix=prefix, suffix=suffix, sep=sep)
 
 def owner_only(func):
-    @wraps(func)
-    async def target_func(self, message, *args):
-        if str(message.author.id) == str(self.owner_id):
-            await func(self, message, *args)
-        else:
-            await message.channel.send('```fix\nSorry. You do not have enough permissions to call this command (´･ω･`)```')
+	@wraps(func)
+	async def target_func(self, message, *args):
+		if str(message.author.id) == str(self.owner_id):
+			await func(self, message, *args)
+		else:
+			await message.channel.send('```fix\nSorry. You do not have enough permissions to call this command (´･ω･`)```')
 
-    return target_func
+	return target_func
 
 def create_song_list():
 	resource_url = 'https://love-live.fandom.com/wiki/Songs_BPM_List'

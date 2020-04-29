@@ -1,7 +1,6 @@
 import aiohttp
 import discord
 import random
-import requests
 import os
 import logging
 import time
@@ -219,8 +218,10 @@ class LoveLive:
 		await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)
 
 	async def _get_lyrics(self, url, lang):
-		r = requests.get(url)
-		soup = BeautifulSoup(r.content, 'html5lib')
+		async with aiohttp.ClientSession() as session:
+			async with session.get(url) as r:
+				soup = BeautifulSoup(await r.read(), 'html5lib')
+				
 		song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
 
 		try:
@@ -284,8 +285,10 @@ class LoveLive:
 		if url == '':
 			return
 
-		r = requests.get(url)
-		soup = BeautifulSoup(r.content, 'html5lib')
+		async with aiohttp.ClientSession() as session:
+			async with session.get(url) as r:
+				soup = BeautifulSoup(await r.read(), 'html5lib')
+
 		song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
 
 		info = soup.find('div', {'id': 'mw-content-text'})
