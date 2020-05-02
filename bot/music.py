@@ -487,6 +487,12 @@ class Music(MusicPlayer):
 
 	@message_voice_filter
 	async def cmd_clear(self, message, *args):
+		'''
+		Clear the music queue
+		Command group: Music
+		Usage: {command_prefix}clear
+		Example: {command_prefix}clear
+		'''
 		self.music_queue = []
 		await message.channel.send('```css\nQueue cleared```')
 

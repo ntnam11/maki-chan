@@ -338,7 +338,7 @@ class Games:
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		self.playing_cardgame = False
 		gc.collect()
@@ -572,7 +572,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		self.playing_lyricgame = False
 
@@ -882,7 +882,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		await self.cmd_leave(message)
 
