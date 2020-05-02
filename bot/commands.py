@@ -1,46 +1,35 @@
-import re
-import aiohttp
-import logging
-import time
-import tempfile
 import asyncio
-import random
-import urllib
+import datetime
 import io
-import shutil
-import traceback
+import logging
 import os
+import random
+import re
+import shutil
+import tempfile
+import platform
+import time
+import traceback
+import urllib
+from textwrap import dedent
+from threading import Timer
+
+import aiohttp
+import discord
+import psutil
 import requests
 import yaml
-
-from threading import Timer
-from textwrap import dedent
-
-import discord
-from PIL import Image
 from bs4 import BeautifulSoup
-from .player import MusicPlayer
-from .games import Games, SIF_IDOL_NAMES, SIF_NAME_LIST
-from .exceptions import *
+from PIL import Image
+
 from .common import *
+from .exceptions import *
+from .games import Games
+from .lovelive import LoveLive
+from .misc import Misc
+from .music import Music
 
-logger = logging.getLogger('Command')
-
-SIF_COLOR_LIST = {
-	'Ayase Eli': 0x36B3DD, 'Hoshizora Rin': 0xF1C51F, 'Koizumi Hanayo': 0x54AB48,
-	'Kousaka Honoka': 0xE2732D, 'Minami Kotori': 0x8C9395, 'Nishikino Maki': 0xCC3554,
-	'Sonoda Umi': 0x1660A5, 'Toujou Nozomi': 0x744791, 'Yazawa Nico': 0xD54E8D,
-	'Takami Chika': 0xF0A20B, 'Sakurauchi Riko': 0xE9A9E8, 'Watanabe You': 0x49B9F9,
-	'Tsushima Yoshiko': 0x898989, 'Kurosawa Ruby': 0xFB75E4, 'Kunikida Hanamaru': 0xE6D617,
-	'Ohara Mari': 0xAE58EB, 'Kurosawa Dia': 0xF23B4C, 'Matsuura Kanan': 0x13E8AE,
-	'Kira Tsubasa': 0xFFFFFF, 'Toudou Erena': 0xFFFFFF, 'Yuuki Anju': 0xFFFFFF,
-	'Miyashita Ai': 0xFDA566, 'Yuki Setsuna': 0xFD767A, 'Emma Verde': 0xA6E37B,
-	'Asaka Karin': 0x96B1E8, 'Uehara Ayumu': 0xE792A9, 'Osaka Shizuku': 0xAEDCF4,
-	'Tennoji Rina': 0xAEABAE, 'Konoe Kanata': 0xD299DE, 'Nakasu Kasumi': 0xF2EB90,
-	'Alpaca': 0x8C9395, 'Shiitake': 0xE9A9E8, 'Uchicchi': 0x49B9F9,
-	"Chika's Mother": 0xF0A20B, "Honoka's Mother": 0xE2732D, "Kotori's Mother": 0x8C9395, "Maki's Mother": 0xCC3554, "Nico's Mother": 0xD54E8D,
-	'Yazawa Cocoa': 0xD54E8D, 'Yazawa Cocoro': 0xD54E8D, 'Yazawa Cotarou': 0xD54E8D,
-}
+logger = logging.getLogger('root.commands')
 
 async def _get_pic(img_type):
 	url = "https://rra.ram.moe/i/r?type=%s" % (img_type)
@@ -68,7 +57,7 @@ def _pic_func(func_obj):
 			Sends a pic
 			Command group: Pics with target
 			Usage: {command_prefix}[action] [mention / text]
-			Example: ~[action] / ~[action] @_Kotori_
+			Example: {command_prefix}[action] / {command_prefix}[action] @_Kotori_
 			'''
 			url = await _get_pic(func_obj['type'])
 			if url['error']:
@@ -90,7 +79,7 @@ def _pic_func(func_obj):
 			Sends a pic
 			Command group: Pics
 			Usage: {command_prefix}[action]
-			Example: ~[action]
+			Example: {command_prefix}[action]
 			'''
 			url = await _get_pic(func_obj['type'])
 			if url['error']:
@@ -102,7 +91,7 @@ def _pic_func(func_obj):
 				await delete_message(message)
 		return notarget_func
 
-class Commands(MusicPlayer, Games):
+class Commands(Music, Games, LoveLive, Misc):
 	def __init__(self):
 		return super(Commands, self).__init__()
 
@@ -111,7 +100,7 @@ class Commands(MusicPlayer, Games):
 		Set bot's prefix
 		Command group: Special
 		Usage: {command_prefix}setprefix [prefix]
-		Example: ~setprefix !
+		Example: {command_prefix}setprefix !
 		'''
 		self.prefix = prefix
 		await message.channel.send('```Set prefix: {0}```'.format(prefix))
@@ -123,7 +112,7 @@ class Commands(MusicPlayer, Games):
 		Set bot's avatar
 		Command group: Special
 		Usage: {command_prefix}setavatar [url/image attachment]
-		Example: ~setavatar https://c7.uihere.com/files/736/106/562/maki-nishikino-tsundere-japanese-idol-love-live-sunshine-manga-others.jpg
+		Example: {command_prefix}setavatar https://c7.uihere.com/files/736/106/562/maki-nishikino-tsundere-japanese-idol-love-live-sunshine-manga-others.jpg
 		'''
 		if isinstance(url, str):
 			async with aiohttp.ClientSession() as session:
@@ -144,19 +133,31 @@ class Commands(MusicPlayer, Games):
 	
 	async def cmd_avatar(self, message, *args):
 		'''
-		View bot's avatar
+		View bot's or someone's avatar
 		Command group: Special
-		Usage: {command_prefix}avatar
-		Example: ~avatar
+		Usage: {command_prefix}avatar [user]
+		Example:
+			{command_prefix}avatar
+			{command_prefix}avatar @_Kotori_
 		'''
-		await message.channel.send(f'Hi! This is my avatar <3\n{self.user.avatar_url}')
+		embed = discord.Embed()
+
+		if len(args) > 0:
+			if len(message.mentions) > 0:
+				target = message.mentions[0]
+				embed.set_image(url=target.avatar_url)
+				await message.channel.send(f'{target.name}\'s avatar', embed=embed)
+				return
+
+		embed.set_image(url=self.user.avatar_url)
+		await message.channel.send('Hi! This is my avatar :heart:', embed=embed)
 
 	async def cmd_help(self, message, command, *args, **kwargs):
 		'''
 		Display help
 		Command group: Special
 		Usage: {command_prefix}help [command]
-		Example: ~help / ~help setprefix
+		Example: {command_prefix}help setprefix
 		'''
 		e = discord.Embed()
 		
@@ -173,7 +174,7 @@ class Commands(MusicPlayer, Games):
 				e.title = 'Command list'
 				for group in groups:
 					e.add_field(name=group, value=', '.join(groups[group]), inline=False)
-			await message.channel.send(embed=e)
+			await message.channel.send(f'```css\nType {self.prefix}help [command] to know more about a command```', embed=e)
 		
 		else:
 			if 'cmd_' + command in dir(self):
@@ -184,8 +185,8 @@ class Commands(MusicPlayer, Games):
 				_ = {
 					'Description': desc[:desc.index('Command group')],
 					'Command group': desc[desc.index('Command group'):desc.index('Usage')].replace('Command group:', ''),
-					'Usage': desc[desc.index('Usage'):desc.index('Example')].replace('Usage:', ''),
-					'Example': desc[desc.index('Example'):].replace('Example:', '')
+					'Usage': desc[desc.index('Usage'):desc.index('Example')].replace('Usage:', '').replace('{command_prefix}', self.prefix),
+					'Example': desc[desc.index('Example'):].replace('Example:', '').replace('{command_prefix}', self.prefix)
 				}
 				for k, v in _.items():
 					e.add_field(name=k, value=v, inline=False)
@@ -195,300 +196,13 @@ class Commands(MusicPlayer, Games):
 				await message.channel.send('Command not found')
 				return
 	
-	async def cmd_say(self, message, *args):
-		'''
-		Make the bot say something
-		Command group: Misc
-		Usage: {command_prefix}say [text]
-		Example: ~say Hello!
-		'''
-		await message.channel.send(' '.join(args))
-		await delete_message(message)
-	
-	async def cmd_bigtext(self, message, *args):
-		"""
-		Display a BIGTEXT :D
-		Command group: Misc
-		Usage: {command_prefix}bigtext [text]
-		Example: ~bigtext woohoo
-		"""
-		result = ""
-		
-		for word in args:
-			for s in word:
-				if s != ' ':
-					result += ":regional_indicator_%s:" % s
-			result += " "
-
-		await message.channel.send(result)
-		await delete_message(message)
-
-	async def cmd_lenny(self, message, *args):
-		'''
-		Sends a ( ͡° ͜ʖ ͡°)
-		Command group: Pics
-		Usage: {command_prefix}lenny
-		Example: ~lenny
-		'''
-		await message.channel.send('( ͡° ͜ʖ ͡°)')
-		await delete_message(message)
-
-	async def cmd_cat(self, message, *args):
-		'''
-		Sends a random cat from random.cat
-		Command group: Misc
-		Usage: {command_prefix}cat
-		Example: ~cat
-		'''
-		url = "https://aws.random.cat/meow"
-		network_timeout = False
-
-		while not network_timeout:
-			async with aiohttp.ClientSession() as session:
-				async with session.get(url) as r:
-					if r.status == 200:
-						js = await r.json()
-						url = js['file']
-						# url = "https://rra.ram.moe%s" % (link)
-						break
-					else:
-						print('Error: %s' % r.status)
-						network_timeout = True
-						return {'error': True, 'message': 'HTTP Error %s. Please try again.' % r.status}
-
-		await message.channel.send(url)
-		# return {'error': False, 'url': url}
-
-	async def cmd_join(self, message, *args):
-		'''
-		Join a voice channel
-		Command group: Music
-		Usage: {command_prefix}join
-		Example: ~join
-		'''
-		if self.voice_client:
-			if self.voice_client.is_playing():
-				await message.channel.send('```prolog\nSorry. I\'m busy playing some music now :(```')
-				return {'error': True}
-
-		try:
-			self.voice_channel = message.author.voice.channel
-		except AttributeError:
-			await message.channel.send('```css\nPlease join a voice channel first :D```')
-			return {'error': True}
-			
-		try:
-			self.voice_client = await self.voice_channel.connect()
-			if not self.voice_client:
-				self.voice_client = self.voice_clients[0]
-		except asyncio.TimeoutError:
-			await message.channel.send('```css\nCould not connect to the voice channel in time```')
-			return {'error': True}
-		except discord.ClientException:
-			await message.channel.send('```css\nAlready connected to voice channel```')
-			return {'error': True}
-		except discord.opus.OpusNotLoaded:
-			try:
-				from opus_loader import load_opus_lib
-				load_opus_lib()
-			except RuntimeError:
-				await message.channel.send('```css\nError loading opus lib. Cannot join voice channel```')
-				return {'error': True}
-
-		await message.channel.send('```css\nConnected to "%s"```' % self.voice_channel.name)
-		return {'error': False}
-	
-	async def cmd_leave(self, message, *args):
-		'''
-		Leave a voice channel
-		Command group: Music
-		Usage: {command_prefix}leave
-		Example: ~leave
-		'''
-		if self.playing_radio:
-			self.force_stop_radio = True
-		if self.current_song is not None:
-			self.force_stop_music = True
-		if not self.voice_client and not self.voice_channel:
-			# await message.channel.send('```prolog\nHm... I haven\'t joined any voice channel```')
-			return
-		if self.voice_client.is_playing():
-			self.voice_client.stop()
-		await self.voice_client.disconnect()
-		if message:
-			await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
-		self.voice_channel = None
-		self.voice_client = None
-		self.playing_radio = False
-		self.force_stop_radio = False
-		self.radio_cache = []
-		self.force_stop_music = False
-
-	async def cmd_play(self, message, query, *args):
-		'''
-		(Search and) Queue a youtube video url
-		Command group: Music
-		Usage:
-			{command_prefix}play [query]
-			- Search a video and queue the first result
-			
-			{command_prefix}play [youtube_url]
-			- Queue the youtube_url
-
-		Example:
-			~play snow halation
-			~play https://www.youtube.com/watch?v=g1p5eNOsl7I
-		'''
-		if not self.youtube_apikey or self.youtube_apikey == '':
-			await message.channel.send('```css\nYoutube API key not found. Please set one in global.yaml or environment variable```')
-			return
-
-		if not self.voice_channel:
-			await self.cmd_join(message)
-
-		if len(self.music_queue) >= 50:
-			await message.channel.send('```css\nCannot add song due to maximum queue length reached```')
-			return
-		
-		self.voice_text_channel = message.channel
-
-		async with message.channel.typing():
-			await self._process_query(*[query, *args])
-
-	async def cmd_search(self, message, query, *args):
-		'''
-		Search a video on youtube, up to 10 results
-		Command group: Music
-		Usage: {command_prefix}search [query]
-		Example: ~search snow halation
-		'''
-		if not self.youtube_apikey or self.youtube_apikey == '':
-			await message.channel.send('```fix\nYoutube API key not found. Please set one in global.yaml or environment variable```')
-			return
-
-		if len(self.music_queue) >= 50:
-			await message.channel.send('```fix\nCannot add song due to maximum queue length reached```')
-			return
-
-		async with message.channel.typing():
-			r = await self._youtube_search(' '.join([query, *args]))
-
-			str_result = '```css\n'
-
-			if r['error']:
-				await message.channel.send('```fix\n%s```' % r['message'])
-			else:
-				for i, result in enumerate(r['result']):
-					str_result += '%s. %s\n' % (i, result['title'])
-			
-			str_result += 'c. Cancel```'
-
-			await message.channel.send(str_result)
-				
-		def _cond(m):
-			return m.channel == message.channel
-
-		start = int(time.time())
-		checktimeout = False
-		while True:
-			if (int(time.time()) - start) >= 30:
-				checktimeout = True
-
-			try:
-				response_message = await self.wait_for('message', check=_cond, timeout=30)
-			except asyncio.TimeoutError:
-				response_message = None
-
-			if (checktimeout == True) or (not response_message):
-				await message.channel.send('```fix\nTimeout. Request aborted```')
-				return
-
-			resp = response_message.content.lower()
-
-			if (resp == 'c'):
-				await message.channel.send('```css\nOkay. Nevermind```')
-				return
-
-			if not resp.isdigit() or int(resp) not in range(0, len(r['result'])):
-				await message.channel.send('```fix\nPlease type the correct number```')
-			
-			else:
-				break
-
-		self.voice_text_channel = message.channel
-
-		if not self.voice_channel:
-			await self.cmd_join(message)
-
-		async with message.channel.typing():
-			await self._process_query('https://www.youtube.com/watch?v=' + r['result'][int(resp)]['id'], title=r['result'][int(resp)]['title'])
-
-	async def cmd_np(self, message, *args):
-		'''
-		Show what's being played in voice channel
-		Command group: Music
-		Usage: {command_prefix}np
-		Example: ~np
-		'''
-		if self.playing_radio:
-			await message.channel.send('```fix\nNow playing non-stop Love Live!! songs```')
-			return
-
-		if self.current_song:
-			await message.channel.send('```fix\nNow playing: %s```\n%s' % (self.current_song.title, self.current_song.url))
-		else:
-			await message.channel.send('```fix\nNothing is being played at the moment. Wanna add some?```')
-
-	async def cmd_skip(self, message, *args):
-		'''
-		Skip current playing song in voice channel
-		Command group: Music
-		Usage: {command_prefix}skip
-		Example: ~skip
-		'''
-		if self.playing_radio:
-			if self.voice_client:
-				if self.voice_client.is_playing():
-					self.voice_client.stop()
-			# await self.cmd_llradio(message)
-			return
-		if self.current_song:
-			self.voice_client.stop()
-			if not self.music_loop:
-				await message.channel.send('```fix\nSkipped %s```' % self.current_song.title)
-				await self._process_queue()
-			else:
-				await message.channe.send('```fix\nWell, you may need to turn off looping before skipping```')
-		else:
-			await message.channel.send('```fix\nNothing to skip at the moment```')
-
-	async def cmd_queue(self, message, *args):
-		'''
-		Show music queue
-		Command group: Music
-		Usage: {command_prefix}queue
-		Example: ~queue
-		'''
-		if len(self.music_queue) == 0:
-			await message.channel.send('```css\nNo song in queue. Wanna add some?```')
-			return
-
-		str_result = '```css\n'
-
-		for i, result in enumerate(self.music_queue):
-			str_result += '%s. %s\n' % (i + 1, result.title)
-		
-		str_result += '```'
-
-		await message.channel.send(str_result)
-
 	@owner_only
 	async def cmd_shutdown(self, message, *args):
 		'''
-		Force a shutdown :D
+		Force a shutdown (´･ω･`)
 		Command group: Owner only
 		Usage: {command_prefix}shutdown
-		Example: ~shutdown
+		Example: {command_prefix}shutdown
 		'''
 		if self.voice_client:
 			if self.voice_client.is_connected():
@@ -497,14 +211,14 @@ class Commands(MusicPlayer, Games):
 				await self.voice_client.disconnect()
 		
 		await message.channel.send(':wave:')
-		exit()
+		raise SleepException
 
 	async def cmd_flush(self, message, *args):
 		'''
 		Force a memory flush & clean all cache
 		Command group: Special
 		Usage: {command_prefix}flush
-		Example: ~flush
+		Example: {command_prefix}flush
 		'''
 		if self.voice_client:
 			if self.voice_client.is_connected():
@@ -524,6 +238,9 @@ class Commands(MusicPlayer, Games):
 		self.force_stop_radio = False
 		self.force_stop_music = False
 		self.music_loop = False
+		self.scouting = False
+		self.radio_cache = []
+		self.radio_requests = {}
 
 		await message.channel.send('```css\nDone```')
 		
@@ -532,9 +249,9 @@ class Commands(MusicPlayer, Games):
 		Show most recent changelog
 		Command group: Misc
 		Usage: {command_prefix}flush
-		Example: ~flush
+		Example: {command_prefix}flush
 		'''
-		str_result = '```md\n'
+		str_result = 'md\n'
 
 		with open('CHANGELOG.md') as f:
 			content = f.readlines()
@@ -550,211 +267,9 @@ class Commands(MusicPlayer, Games):
 				_ += 1
 				str_result += line
 
-		str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */```'
+		str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */'
 
-		await message.channel.send(str_result)
-
-	async def cmd_cardinfo(self, message, card_id, *args, internal=False):
-		'''
-		Show info of a LLSIF card by id (idolized if defined)
-		Command group: LLSIF
-		Usage: {command_prefix}cardinfo card_id [idlz / idolized]
-		Example:
-			~cardinfo 2145
-			~cardinfo 2145 idlz
-		'''
-		promo = ''
-		getinfo = 'card_image'
-		card_id = str(card_id)
-
-		if not card_id.isdigit():
-			await message.channel.send('```prolog\nPlease type card id properly```')
-			return
-		else:
-			if args:
-				if args[0].lower() in ['idlz', 'idolized']:
-					getinfo = 'card_idolized_image'
-
-		async with message.channel.typing():
-			url = 'http://schoolido.lu/api/cards/%s/' % (card_id)
-
-			async with aiohttp.ClientSession() as session:
-				async with session.get(url) as r:
-					if r.status == 200:
-						js = await r.json()
-						img = 'http:%s' % (js[getinfo])
-						card_name = js['idol']['name']
-						collection = js['translated_collection']
-						release_date = js['release_date']
-						is_promo = js['is_promo']
-						attribute = js['attribute']
-						ranking_attribute = js['ranking_attribute']
-						if img == "http:None":
-							if not internal:
-								await message.channel.send('This card does not have unidolized version. Here\'s the idolized.')
-							img = 'http:%s' % (js['card_idolized_image'])
-						if is_promo == 'True':
-							promo = 'Promo Card\n'
-						else:
-							promo = ''
-
-						await message.channel.send(
-							f'{img}\n```prolog\nCard No. {card_id}\nName: {card_name}\nCollection: {collection}\n' +
-							f'Released date: {release_date}\n{promo}#{ranking_attribute} best {attribute} card```\n'
-						)
-						return 1
-					else:
-						if not internal:
-							await message.channel.send('```prolog\nNetwork timed out or card not found.```')
-						return 0
-
-	async def cmd_randomcard(self, message, *args):
-		'''
-		Show info of a random LLSIF card by idol / rarity
-		Command group: LLSIF
-		Usage:
-			{command_prefix}randomcard [idol] [rarity]
-			- idol: 
-				maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
-				ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
-				ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi,
-				and some support characters
-			- rarity: R, SR, SSR, UR
-		Example:
-			~randomcard
-			~randomcard kotori
-			~randomcard ur
-			~randomcard kotori ur
-		'''
-		if not args:
-			found = False
-			while not found:
-				random_id = random.randint(1, self.max_sif_cards)
-				r = await self.cmd_cardinfo(message, random_id, internal=True)
-				if r:
-					return
-
-		url = 'http://schoolido.lu/api/cardids/?'
-
-		args = list(args)
-
-		while args:
-			query = args.pop(0)
-			if query is not None:
-				query = query.lower()
-				if query in SIF_NAME_LIST:
-					url += 'name=%s&' % SIF_IDOL_NAMES[query]
-					logger.info('Set url: %s' % url)
-				
-				if query in ['r', 'sr', 'ssr', 'ur']:
-					url += 'rarity=%s&' % query
-					logger.info('Set url: %s' % url)
-			
-		async with message.channel.typing():
-			async with aiohttp.ClientSession() as session:
-				async with session.get(url) as r:
-					if r.status == 200:
-						js = await r.json()
-						card_num = random.choice(js)
-						logger.info('Random card: %s' % card_num)
-						await self.cmd_cardinfo(message, card_num)
-						return
-					else:
-						logger.info('Error: %s' % r.status)
-						await message.channel.send('```prolog\nHTTP Error %s. Please try again later.```' % r.status)
-						return
-	
-	async def cmd_idolinfo(self, message, query, *args):
-		'''
-		Show info of a Love Live!! Idol
-		Command group: LLSIF
-		Usage:
-			{command_prefix}idolinfo [name]
-			- name:
-				maki, rin, hanayo, kotori, honoka, umi, eli, nozomi, nico,
-				ruby, hanamaru, yoshiko, yohane, you, chika, riko, mari, kanan, dia,
-				ayumu, ai, setsuna, kanata, karin, emma, rina, shizuku, kasumi
-		Example:
-			~idolinfo kotori
-		'''
-		logger.info("Searched for %s" % (query))
-
-		if query not in SIF_NAME_LIST:
-			await message.channel.send('```prolog\nIdol not found.```')
-			return
-
-		idol = SIF_IDOL_NAMES[query]
-
-		url = 'http://schoolido.lu/api/idols/%s/' % (idol)
-		logger.info("Getting info from %s" % (url))
-
-		async with aiohttp.ClientSession() as session:
-			async with session.get(url) as r:
-				if r.status == 200:
-					js = await r.json()
-
-					name = js['name']
-					jpname = js['japanese_name']
-					age = js['age']
-					school = js['school']
-					birthday = js['birthday']
-					astrological_sign = js['astrological_sign']
-					blood = js['blood']
-					height = js['height']
-					measurements = js['measurements']
-					favorite_food = js['favorite_food']
-					least_favorite_food = js['least_favorite_food']
-					hobbies = js['hobbies']
-					attribute = js['attribute']
-					year = js['year']
-					main_unit = js['main_unit']
-					sub_unit = js['sub_unit']
-
-					try:
-						cv_name = js['cv']['name']
-					except:
-						cv_name = js['cv']
-					try:
-						cv_nickname = js['cv']['nickname']
-					except:
-						cv_nickname = js['cv']
-
-					summary = js['summary']
-					chibi = js['chibi_small']
-
-				else:
-					await message.channel.send('```prolog\nError occurs. Please try again later.```')
-
-		e = discord.Embed(title="Idol information", type="rich", color=SIF_COLOR_LIST[name])
-
-		e.set_thumbnail(url="%s" % chibi)
-
-		e.add_field(name="Name", value=name, inline=True)
-		e.add_field(name="Japanese", value=jpname, inline=True)
-		e.add_field(name="Age", value=age, inline=True)
-
-		e.add_field(name="Birthday", value=birthday, inline=True)
-		e.add_field(name="Sign", value=astrological_sign, inline=True)
-		e.add_field(name="Year", value=year, inline=True)
-		e.add_field(name="School", value=school, inline=True)
-
-		e.add_field(name="Blood type", value=blood, inline=True)
-		e.add_field(name="Height", value=height, inline=True)
-		e.add_field(name="Measurements", value=measurements, inline=True)
-
-		e.add_field(name="Favourite food", value=favorite_food, inline=True)
-		e.add_field(name="Dislike food", value=least_favorite_food, inline=True)
-		
-		e.add_field(name="Hobbies", value=hobbies, inline=True)
-		e.add_field(name="Main unit", value=main_unit, inline=True)
-		e.add_field(name="Sub unit", value=sub_unit, inline=True)
-
-		e.add_field(name="Summary", value=summary, inline=False)
-
-		e.add_field(name="CV", value=cv_name, inline=True)
-		e.add_field(name="Nickname", value=cv_nickname, inline=True)
-
-		await message.channel.send('```css\nYou searched for "%s"\n```' % (query), embed=e)
+		await message.channel.send('```' + str_result.replace('`', '') + '```')
 
 	# @owner_only
 	async def cmd_debug(self, message, command, *args):
@@ -764,7 +279,7 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}debug [command]
 		Example:
-			~debug self
+			{command_prefix}debug self
 		'''
 		command = ' '.join([command, *args])
 		forbidden = ['import', 'del', 'os', 'shutil', 'sys', 'open', 'eval', 'exec']
@@ -779,7 +294,7 @@ class Commands(MusicPlayer, Games):
 		except Exception as e:
 			cmd_result = repr(e)
 		result = '```python\n%s```' % (cmd_result)
-		await message.channel.send(result)
+		await send_long_message(message.channel, result, prefix='```python\n', suffix='```')
 
 	@owner_only
 	async def cmd_message(self, message, uid, content, *args):
@@ -791,7 +306,7 @@ class Commands(MusicPlayer, Games):
 			- uid: User id
 			- content: message to send
 		Example:
-			~message 309579216322691073 Hi!
+			{command_prefix}message 309579216322691073 Hi!
 		'''
 		for guild in self.guilds:
 			for member in guild.members:
@@ -808,7 +323,7 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}listserver
 		Example:
-			~listserver
+			{command_prefix}listserver
 		'''
 		result = ''
 		for guild in self.guilds:
@@ -823,7 +338,7 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}leaveserver [server_id]
 		Excample:
-			~leaveserver 332012392104912758
+			{command_prefix}leaveserver 332012392104912758
 		'''
 		try:
 			guild = self.get_guild(int(server_id))
@@ -833,171 +348,7 @@ class Commands(MusicPlayer, Games):
 				return
 		except ValueError:
 			await message.channel.send('```Invalid server ID```')
-		await message.channel.send('```prolog\nI\'m not in that server :(```')
-
-	async def cmd_llradio(self, message, *args):
-		'''
-		Play a random Love Live!! song (including Sunshine, Nijigasaki & Saint Snow)
-		If you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot
-		Command group: Music
-		Usage:
-			{command_prefix}llradio
-		Example:
-			~llradio
-		'''
-		song_cache = os.path.join('game_cache', 'songs')
-		song_list = os.path.join('game_cache', 'song_list')
-		if not os.path.exists(song_list):
-			songs_available = self._create_song_list()
-		else:
-			with open(song_list, mode='r') as f:
-				songs_available = f.readlines()
-		
-		if len(self.radio_cache) >= 50:
-			self.radio_cache.pop(0)
-
-		self.playing_radio = True
-
-		if self.force_stop_radio:
-			return
-
-		if not self.voice_client:
-			r = await self.cmd_join(message)
-			if r['error']:
-				return
-
-		self.check_sleep(message)
-
-		while True:
-			song_url = random.choice(songs_available)
-			if song_url in self.radio_cache:
-				continue
-			else:
-				self.radio_cache.append(song_url)
-
-			r = requests.get(song_url.strip())
-			soup =  BeautifulSoup(r.content, 'html5lib')
-
-			song_name = soup.find('h1', {'class': 'page-header__title'}).text.strip()
-			song_files = soup.find_all('div', {'class': 'ogg_player'})
-			song_file = random.choice(song_files)
-
-			for p in song_file.parents:
-				if p.name == 'td':
-					td = p
-					break
-
-			t = None
-
-			for p in song_file.parents:
-				if 'class' in p.attrs:
-					if 'tabbertab' in p.attrs['class']:
-						t = p
-						break
-				if 'id' in p.attrs:
-					if p.attrs['id'] == 'mw-content-text':
-						break
-
-			if t is None:
-				break
-
-			if t.attrs['title'].lower() != 'radio drama':
-					break
-
-		song_length = td.previous_sibling
-		song_name = song_length.previous_sibling.text.strip()
-
-		song_onclick = song_file.find('button').attrs['onclick']
-		song_url = re.search('"videoUrl":"(.*?)"', song_onclick)[1]
-
-		song_r = requests.get(song_url)
-		song_data = song_r.content
-		with open(os.path.join('game_cache', 'radio.ogg'), mode='wb+') as f:
-			f.write(song_data)
-
-		game = discord.Game(song_name)
-		await self.change_presence(activity=game)
-
-		source = discord.FFmpegPCMAudio(os.path.join(os.getcwd(), 'game_cache', 'radio.ogg'), executable='ffmpeg')
-
-		md = random.choice(['fix', 'css', 'prolog', 'autohotkey', 'bash', 'coffeescript', 'md', 'ml', 'cs', 'diff', 'tex'])
-
-		if md in ['diff']:
-			prefix = '!'
-		elif md in ['tex']:
-			prefix = '$'
-		else:
-			prefix = '#'
-
-		await message.channel.send(f'```{md}\n{prefix} Now playing: {song_name}```')
-
-		self.voice_client.play(source, after=lambda e: asyncio.run_coroutine_threadsafe(self.cmd_llradio(message), self.loop))
-
-	async def cmd_stop(self, message, *args):
-		'''
-		Force stop Love Live!! radio
-		Command group: Music
-		Usage: {command_prefix}stop
-		Example: ~stop
-		'''
-		if self.playing_radio:
-			self.force_stop_radio = True
-		
-		if self.current_song is not None:
-			self.force_stop_music = True
-
-		if self.voice_client:
-			if self.voice_client.is_playing():
-				self.voice_client.stop()
-
-		await message.channel.send('```css\nDone```')
-
-		self.force_stop_radio = False
-		self.radio_cache = []
-		self.music_queue = []
-		self.music_loop = False
-		self.force_stop_music = False
-
-	async def cmd_loop(self, message, *args):
-		'''
-		Loop a song
-		Command group: Music
-		Usage: {command_prefix}loop
-		Example: ~loop
-		'''
-		if self.playing_radio:
-			await message.channel.send('```fix\nWell, u can\'t loop a radio bruh :|```')
-			return
-		
-		if not self.voice_client:
-			await message.channel.send('```fix\nNothing to loop at the moment```')
-
-		self.music_loop = not self.music_loop
-
-		if self.music_loop:
-			await message.channel.send('```prolog\nLoop: on```')
-		else:
-			await message.channel.send('```prolog\nLoop: off```')
-
-	async def cmd_choose(self, message, choice, *args):
-		'''
-		Help u to choose something lmao
-		Don't blame me if something goes wrong :|
-		Command group: Misc
-		Usage: {command_prefix}choose [option 1], [option 2],...
-		Example: ~choose friend, like, love
-		'''
-
-		if args is not None:
-			text = ' '.join([choice, *args])
-			choices = text.split(', ')
-		else:
-			await message.channel.send(f'```prolog\nOh cmon. Give me some more options :|```')
-			return
-		
-		result = random.choice(choices)
-			
-		await message.channel.send(f'Well, I choose **{result}**!')
+		await message.channel.send('```prolog\nI\'m not in that server (*´д｀*)```')
 
 	@owner_only
 	async def cmd_config(self, message, key, value, *args):
@@ -1007,7 +358,7 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}config [key] [value]
 		Example:
-			~config active_from 8
+			{command_prefix}config active_from 8
 		'''
 		if key == 'skip_status':
 			if value in ['true', 'True', 't', 'T', 1, '1']:
@@ -1025,12 +376,15 @@ class Commands(MusicPlayer, Games):
 			except ValueError:
 				self.config[key] = value
 
+			try:
+				setattr(self, key, t(value))
+			except ValueError:
+				setattr(self, key, value)
+
 			with open('config/global.yaml', mode='w+') as f:
 				yaml.dump(self.config, f, Dumper=yaml.CSafeDumper)
 			
 		await message.channel.send('```css\nDone```')
-
-		self.load_config()
 
 	async def cmd_apistatus(self, message, *args):
 		'''
@@ -1039,7 +393,7 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}status
 		Example:
-			~status
+			{command_prefix}status
 		'''
 		check = {
 			'cardgame': {
@@ -1077,6 +431,7 @@ class Commands(MusicPlayer, Games):
 			'Randomcard': check['cardgame']['status'],
 			'Cardinfo': check['cardgame']['status'],
 			'Idolinfo': check['cardgame']['status'],
+			'Scout': check['cardgame']['status']
 		}
 		
 		strresult = ''
@@ -1093,7 +448,40 @@ class Commands(MusicPlayer, Games):
 		Usage:
 			{command_prefix}status [status_text]
 		Example:
-			~status Singing a song~
+			{command_prefix}status Singing a song~
 		'''
 		game = discord.Game(' '.join([status_text, *args]))
 		await self.change_presence(activity=game)
+
+	async def cmd_info(self, message, *args):
+		'''
+		Show bot's debug information
+		Command group: Owner only
+		Usage:
+			{command_prefix}info
+		Example:
+			{command_prefix}info
+		'''
+		psutil.cpu_percent(interval=None)
+		embed = discord.Embed()
+
+		cpu_time = str(datetime.timedelta(seconds=time.time() - psutil.boot_time()))
+		mem = psutil.virtual_memory()
+		await asyncio.sleep(1)
+		cpu_percent = psutil.cpu_percent(interval=None)
+
+		version = discord.version_info
+		version = f'v{version.major}.{version.minor}.{version.micro} ({version.releaselevel})'
+
+		embed.add_field(name='Platform', value=platform.platform())
+		embed.add_field(name='Python', value=f'v{platform.python_version()}')
+		embed.add_field(name='Discord', value=version)
+		embed.add_field(name='Uptime', value=cpu_time, inline=False)
+		embed.add_field(name='%CPU', value=cpu_percent)
+		embed.add_field(name='RAM', value=f'{mem.used >> 20}/{mem.total >> 20}')
+		embed.add_field(name='%RAM', value=mem.percent)
+		embed.add_field(name='Guilds', value=len(self.guilds))
+		embed.add_field(name='Users', value=len(self.users))
+		embed.add_field(name='Latency', value=f'{round(self.latency * 100)/100}s')
+
+		await message.channel.send(embed=embed)

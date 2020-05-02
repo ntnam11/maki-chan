@@ -4,8 +4,18 @@ import gc
 import discord
 import asyncio
 import time
+import logging.config
+import logging
 
 from bot.exceptions import *
+
+logging.getLogger('websockets.protocol').setLevel('INFO')
+logging.getLogger('PIL.PngImagePlugin').setLevel('INFO')
+logging.getLogger('discord.gateway').setLevel('INFO')
+logging.getLogger('discord.http').setLevel('INFO')
+logging.getLogger('discord.client').setLevel('INFO')
+
+logger = logging.getLogger('root')
 
 async def run():
     try:
@@ -14,16 +24,17 @@ async def run():
         
         client = MainClient()
         client.load_config()
+        logging.config.dictConfig(client.logging)
         load_opus_lib()
 
         if not client.prefix:
-            print('Prefix is not supported. Please choose a different one')
+            logger.error('Prefix is not supported. Please choose a different one')
             raise ConfigException
             
         try:
             await client.start(client.token)
         except discord.LoginFailure:
-            print('No Token specified. Exiting...')
+            logger.error('No Token specified. Exiting...')
             raise ConfigException
         except ConfigException:
             raise
@@ -31,7 +42,7 @@ async def run():
             raise SleepException
         except Exception as e:
             import traceback
-            print(e)
+            logger.error(e)
             traceback.print_exc()
 
     except ImportError as e:
@@ -55,7 +66,7 @@ def main():
         asyncio.set_event_loop(asyncio.get_event_loop())
         retry_count += 1
         timeout = min(retry_count * 2, 30)
-        print(f'Restarting in {timeout} seconds...')
+        logger.error(f'Restarting in {timeout} seconds...')
         time.sleep(timeout)
 
 if __name__ == '__main__':
