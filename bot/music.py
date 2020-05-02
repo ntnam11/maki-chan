@@ -596,7 +596,7 @@ class Music(MusicPlayer):
 		async with aiohttp.ClientSession() as session:
 			while True:
 				if len(self.music_queue) > 0:
-					song_info = self.music_queue.pop()
+					song_info = self.music_queue.pop(0)
 					break
 				else:
 					song_url = random.choice(songs_available)
@@ -685,6 +685,15 @@ class Music(MusicPlayer):
 			{command_prefix}request spicaterrible (off vocal)
 			{command_prefix}request aishiteru banzai (prepro piano mix)
 		'''
+		if query == 'check':
+			if message.author.id in self.radio_requests:
+				last_request = self.radio_requests[message.author.id]
+				if time.time() - last_request < 900:
+
+				next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.timezone, minutes=15)
+
+			return
+
 		if message.author.id in self.radio_requests:
 			last_request = self.radio_requests[message.author.id]
 			if self.voice_channel:
@@ -697,7 +706,7 @@ class Music(MusicPlayer):
 
 				if member_count > 2:
 					if time.time() - last_request < 900:
-						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(minutes=15)
+						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.timezone, minutes=15)
 						await message.channel.send(f'```fix\nSorry. You can only request a song every 15 minutes. Your next request available at {next_request.strftime("%Y-%m-%d %H:%M:%S")}```')
 						return
 

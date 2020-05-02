@@ -30,8 +30,8 @@ class Misc:
 		"""
 		result = ""
 		
-		for word in args.lower():
-			for s in word:
+		for word in args:
+			for s in word.lower():
 				if s != ' ':
 					result += ":regional_indicator_%s:" % s
 			result += " "

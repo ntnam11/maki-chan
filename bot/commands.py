@@ -251,7 +251,7 @@ class Commands(Music, Games, LoveLive, Misc):
 		Usage: {command_prefix}flush
 		Example: {command_prefix}flush
 		'''
-		str_result = '```md\n'
+		str_result = 'md\n'
 
 		with open('CHANGELOG.md') as f:
 			content = f.readlines()
@@ -267,9 +267,9 @@ class Commands(Music, Games, LoveLive, Misc):
 				_ += 1
 				str_result += line
 
-		str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */```'
+		str_result += '\n/* Full changelog: https://github.com/ntnam11/maki-chan/blob/master/CHANGELOG.md */'
 
-		await message.channel.send(str_result.replace('`', ''))
+		await message.channel.send('```' + str_result.replace('`', '') + '```')
 
 	# @owner_only
 	async def cmd_debug(self, message, command, *args):
@@ -479,7 +479,7 @@ class Commands(Music, Games, LoveLive, Misc):
 		embed.add_field(name='Uptime', value=cpu_time, inline=False)
 		embed.add_field(name='%CPU', value=cpu_percent)
 		embed.add_field(name='RAM', value=f'{mem.used >> 20}/{mem.total >> 20}')
-		embed.add_field(name='%RAM', value=cpu_percent)
+		embed.add_field(name='%RAM', value=mem.percent)
 		embed.add_field(name='Guilds', value=len(self.guilds))
 		embed.add_field(name='Users', value=len(self.users))
 		embed.add_field(name='Latency', value=f'{round(self.latency * 100)/100}s')
