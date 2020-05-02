@@ -24,14 +24,6 @@ from .exceptions import *
 
 logger = logging.getLogger('root.Games')
 
-def normalize_text(s):
-	s = s.lower()
-	result = ''
-	for c in s:
-		if ord(c) in range(97, 123) or c == ' ':
-			result += c
-	return result
-
 class _Song:
 	def __init__(self, url):
 		self.text = url
