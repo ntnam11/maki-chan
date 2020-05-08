@@ -158,17 +158,17 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		time_zone = int(self.config['time_zone'])
 		active_to = int(self.config['active_to'])
 		hour = h + time_zone
-		if hour > 24:
+		if hour >= 24:
 			hour -= 24
-		if active_to > 24:
+		if active_to >= 24:
 			active_to -= 24
 		if hour >= active_from + time_zone:
 			return
-		if hour <= active_from and hour >= active_to:
+		if hour < active_from and hour >= active_to:
 			if message:
-				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from + 1}```'), self.loop)
+				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
 			if self.voice_client:
-				asyncio.run_coroutine_threadsafe(self.cmd_leave(message), self.loop)
+				asyncio.run_coroutine_threadsafe(self.cmd_leave(message, internal=True), self.loop)
 			print('Sleep time...')
 			raise SleepException
 
