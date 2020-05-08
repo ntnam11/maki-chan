@@ -2,8 +2,8 @@ token: ''
 prefix: ;
 youtube_apikey: ''
 owner_id: 309579216322691073
-active_from: 7
-active_to: 25
+active_from: 6
+active_to: 24
 time_zone: 7
 max_sif_cards: 5000
 skip_status: False

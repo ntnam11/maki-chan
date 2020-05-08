@@ -251,7 +251,7 @@ class Music(MusicPlayer):
 		return {'error': False}
 	
 	@message_voice_filter
-	async def cmd_leave(self, message, *args):
+	async def cmd_leave(self, message, *args, internal=False):
 		'''
 		Leave a voice channel
 		Command group: Music
@@ -271,6 +271,7 @@ class Music(MusicPlayer):
 			await self.voice_client.disconnect()
 		if message:
 			await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
+
 		self.voice_channel = None
 		self.voice_client = None
 		self.playing_radio = False
@@ -417,7 +418,8 @@ class Music(MusicPlayer):
 					member_count += 1
 
 			if member_count > 2:
-				votes_needed = min(3, int(member_count / 2) + 1)
+				member_count -= 1 # except Maki-chan
+				votes_needed = int(member_count / 2) + 1 + 1 # plus Maki-chan
 				m = await message.channel.send(f'```css\nSkip requested. React with ➕ to skip this song ({votes_needed} needed)```')
 				await m.add_reaction('➕')
 				
@@ -710,7 +712,7 @@ class Music(MusicPlayer):
 
 				if member_count > 2:
 					if time.time() - last_request < 900:
-						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.timezone, minutes=15)
+						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.time_zone, minutes=15)
 						await message.channel.send(f'```fix\nSorry. You can only request a song every 15 minutes. Your next request available at {next_request.strftime("%Y-%m-%d %H:%M:%S")}```')
 						return
 
