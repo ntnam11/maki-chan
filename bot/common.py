@@ -193,14 +193,17 @@ def message_voice_filter(func):
 			if kwargs['internal']:
 				internal = True
 
-		author_voice_ch = message.author.voice
-		if author_voice_ch is not None:
-			author_voice_ch = author_voice_ch.channel
+		author_voice = message.author.voice
+
+		if author_voice is not None:
+			author_voice_ch = author_voice.channel
+		else:
+			author_voice_ch = None
 
 		if not internal:
 			if message.author.id != self.owner_id and (not author_voice_ch or author_voice_ch != self.voice_channel):
 				await message.channel.send('```fix\nSorry, u aren\'t in the same voice channel with me (´･ω･`)```')
-			elif author_voice_ch and author_voice_ch.self_deaf:
+			elif author_voice_ch and author_voice.self_deaf:
 				await message.channel.send('```fix\nIf u\'re not listening, don\'t do that bro (´･ω･`)```')
 			else:
 				await func(self, message, *args, **kwargs)

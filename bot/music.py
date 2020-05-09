@@ -603,7 +603,7 @@ class Music(MusicPlayer):
 
 		if mem_count == 1 or deaf_count == mem_count - 1:
 			await message.channel.send('```fix\nIt seems no one is listening to me. I\'m leaving ┐(‘～`；)┌```')
-			await self.cmd_leave(message)
+			await self.cmd_leave(message, internal=True)
 			return
 
 		song_info = None
