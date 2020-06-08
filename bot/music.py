@@ -277,6 +277,7 @@ class Music(MusicPlayer):
 		self.playing_radio = False
 		self.force_stop_radio = False
 		self.radio_cache = []
+		self.music_queue = []
 		self.force_stop_music = False
 		self.radio_requests = {}
 
@@ -592,8 +593,6 @@ class Music(MusicPlayer):
 			r = await self.cmd_join(message)
 			if r['error']:
 				return
-
-		self.check_sleep(message)
 
 		mem_count = len(self.voice_channel.members)
 		deaf_count = 0

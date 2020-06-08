@@ -45,7 +45,7 @@ class Games:
 			- as: All-stars
 			- card_num: Number of rounds to play
 			- diff:
-				+ easy/e: image size 300x300
+				+ easy/e: image size 300 x 300
 				+ normal/n: image size 200 x 200
 				+ hard/h: image size 150 x 150
 				+ extreme/ex: image size 100 x 100

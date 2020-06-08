@@ -148,29 +148,7 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 		os.mkdir(game_cache_songs)
 		os.mkdir(game_cache_scout)
 
-		self.check_sleep()
-
 		return super(MainClient, self).__init__()
-	
-	def check_sleep(self, message=None):
-		h = datetime.datetime.utcnow().hour
-		active_from = int(self.config['active_from'])
-		time_zone = int(self.config['time_zone'])
-		active_to = int(self.config['active_to'])
-		hour = h + time_zone
-		if hour >= 24:
-			hour -= 24
-		if active_to >= 24:
-			active_to -= 24
-		if hour >= active_from + time_zone:
-			return
-		if hour < active_from and hour >= active_to:
-			if message:
-				asyncio.run_coroutine_threadsafe(message.channel.send(f'```css\nOh... It\'s my bedtime already? Oyasumi <3. See u at {active_from}```'), self.loop)
-			if self.voice_client:
-				asyncio.run_coroutine_threadsafe(self.cmd_leave(message, internal=True), self.loop)
-			print('Sleep time...')
-			raise SleepException
 
 	def check_owner(self, message):
 		if str(message.author.id) == str(self.owner_id):
@@ -239,10 +217,8 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 							# if c == 'llradio':
 								# await message.channel.send('```css\nIf you want another Love Live! Radio instance, consider adding another me: https://discordapp.com/api/oauth2/authorize?client_id=697328604186411018&permissions=70569024&scope=bot```')
 							await cmd(message, None)
-							self.check_sleep(message)
 						else:
 							await cmd(message, *m[len(c) + 1:].split(' '))
-							self.check_sleep(message)
 					except SleepException:
 						await asyncio.sleep(5)
 						await self.close()
@@ -261,12 +237,6 @@ class MainClient(discord.Client, discord.VoiceClient, Commands):
 									game = discord.Game(random.choice(self.statuses))
 									await self.change_presence(activity=game)
 									self.last_status_timestamp = datetime.datetime.utcnow()
-
-			try:
-				if not self.playing_radio:
-					self.check_sleep()
-			except SleepException:
-				await self.close()
 
 			if type(message.channel) == discord.channel.DMChannel:
 				msg = f'Message from {message.author.name}#{message.author.discriminator} ({message.author.id}):\n{message.content}'
