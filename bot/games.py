@@ -24,14 +24,6 @@ from .exceptions import *
 
 logger = logging.getLogger('root.Games')
 
-def normalize_text(s):
-	s = s.lower()
-	result = ''
-	for c in s:
-		if ord(c) in range(97, 123) or c == ' ':
-			result += c
-	return result
-
 class _Song:
 	def __init__(self, url):
 		self.text = url
@@ -53,9 +45,9 @@ class Games:
 			- as: All-stars
 			- card_num: Number of rounds to play
 			- diff:
-				+ easy/e: image size 300x300
-				+ normal/n: image size 200 x 200
-				+ hard/h: image size 150 x 150
+				+ easy/e: image size 300 x 300 (250 x 250 for AS)
+				+ normal/n: image size 200 x 200 (150 x 150 for AS)
+				+ hard/h: image size 150 x 150 (125 x 125 for AS)
 				+ extreme/ex: image size 100 x 100
 				+ custom/c: image size {custom_dimension} x {custom_dimension} 
 			- custom_dimension: an integer between 10 - 400
@@ -105,6 +97,18 @@ class Games:
 			'h': 150,
 			'ex': 100
 		}
+
+		diff_size_as = {
+			'easy': 250,
+			'normal': 150,
+			'hard': 125,
+			'extreme': 100,
+			'e': 250,
+			'n': 150,
+			'h': 125,
+			'ex': 100
+		}
+
 		try:
 			card_num = int(card_num)
 			if card_num <= 0:
@@ -181,8 +185,11 @@ class Games:
 		
 		if all_stars:
 			source = 'Love Live! School Idol Festival ALL STARS'
+			diff_size = diff_size_as
 		else:
 			source = 'Love Live! School Idol Festival'
+			diff_size = diff_size_as
+			
 		await message.channel.send(f'```prolog\nSource: {source}\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}\nNumber of rounds: {card_num}```\nGame starts in 5 seconds. Be ready!')
 
 		checkstart = False
@@ -346,7 +353,7 @@ class Games:
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		self.playing_cardgame = False
 		gc.collect()
@@ -580,7 +587,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		self.playing_lyricgame = False
 
@@ -890,7 +897,7 @@ hint word (-3 points) - a random word of song name (e.g. Snow)
 		for x in sorted_name:
 			strresult += f'{x}: {userinfo[x]}\n'
 
-		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing :3')
+		await message.channel.send(f'Final result:\n```prolog\n{strresult}```\nThanks for playing (´∀｀)')
 
 		await self.cmd_leave(message)
 

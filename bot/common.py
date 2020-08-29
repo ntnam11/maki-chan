@@ -1,3 +1,5 @@
+import asyncio
+import difflib
 import logging
 import os
 import time
@@ -125,8 +127,14 @@ async def get_song_url(client, message, query):
 	for song_url in songs_available:
 		url = song_url.strip()
 		qq = quote(query.replace(' ', '_')).lower()
-		if qq in url.replace('https://love-live.fandom.com/wiki/', '').lower():
+		compare_url = url.replace('https://love-live.fandom.com/wiki/', '').lower()
+		if qq in compare_url:
 			found.append(url)
+		else:
+			normalized = normalize_text(unquote(compare_url).replace('_', ' '), replace=' ')
+			ratio = difflib.SequenceMatcher(None, query, normalized).ratio()
+			if ratio >= 0.7:
+				found.append(url)
 
 	if len(found) == 0:
 		await message.channel.send('```prolog\nHm... I can\'t find this song in the database (´ヘ｀()```')
@@ -180,14 +188,36 @@ async def get_song_url(client, message, query):
 def message_voice_filter(func):
 	@wraps(func)
 	async def target_func(self, message, *args, **kwargs):
-		author_voice_ch = message.author.voice
-		if author_voice_ch is not None:
-			author_voice_ch = author_voice_ch.channel
-		if message.author.id != self.owner_id and (not author_voice_ch or author_voice_ch != self.voice_channel):
-			await message.channel.send('```fix\nSorry, u aren\'t in the same voice channel with me (´･ω･`)```')
-		elif message.author.voice.self_deaf:
-			await message.channel.send('```fix\nIf u\'re not listening, don\'t do that bro (´･ω･`)```')
+		internal = False
+		if 'internal' in kwargs:
+			if kwargs['internal']:
+				internal = True
+
+		author_voice = message.author.voice
+
+		if author_voice is not None:
+			author_voice_ch = author_voice.channel
+		else:
+			author_voice_ch = None
+
+		if not internal:
+			if message.author.id != self.owner_id and (not author_voice_ch or author_voice_ch != self.voice_channel):
+				await message.channel.send('```fix\nSorry, u aren\'t in the same voice channel with me (´･ω･`)```')
+			elif author_voice_ch and author_voice.self_deaf:
+				await message.channel.send('```fix\nIf u\'re not listening, don\'t do that bro (´･ω･`)```')
+			else:
+				await func(self, message, *args, **kwargs)
 		else:
 			await func(self, message, *args, **kwargs)
 
 	return target_func
+
+def normalize_text(s, replace=''):
+	s = s.lower()
+	result = ''
+	for c in s:
+		if ord(c) in range(97, 123) or c == ' ':
+			result += c
+		else:
+			result += replace
+	return result

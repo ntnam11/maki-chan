@@ -251,7 +251,7 @@ class Music(MusicPlayer):
 		return {'error': False}
 	
 	@message_voice_filter
-	async def cmd_leave(self, message, *args):
+	async def cmd_leave(self, message, *args, internal=False):
 		'''
 		Leave a voice channel
 		Command group: Music
@@ -271,11 +271,13 @@ class Music(MusicPlayer):
 			await self.voice_client.disconnect()
 		if message:
 			await message.channel.send('```prolog\nLeft "%s"```' % self.voice_channel.name)
+
 		self.voice_channel = None
 		self.voice_client = None
 		self.playing_radio = False
 		self.force_stop_radio = False
 		self.radio_cache = []
+		self.music_queue = []
 		self.force_stop_music = False
 		self.radio_requests = {}
 
@@ -417,7 +419,8 @@ class Music(MusicPlayer):
 					member_count += 1
 
 			if member_count > 2:
-				votes_needed = min(3, int(member_count / 2) + 1)
+				member_count -= 1 # except Maki-chan
+				votes_needed = int(member_count / 2) + 1 + 1 # plus Maki-chan
 				m = await message.channel.send(f'```css\nSkip requested. React with ➕ to skip this song ({votes_needed} needed)```')
 				await m.add_reaction('➕')
 				
@@ -435,7 +438,7 @@ class Music(MusicPlayer):
 
 					reaction_count = 0
 					async for user in m.reactions[0].users():
-						if user in self.voice_channel.members:
+						if user in self.voice_channel.members and not user.voice.self_deaf:
 							reaction_count += 1
 
 					if reaction_count >= votes_needed:
@@ -484,6 +487,17 @@ class Music(MusicPlayer):
 		str_result += '```'
 
 		await message.channel.send(str_result)
+
+	@message_voice_filter
+	async def cmd_clear(self, message, *args):
+		'''
+		Clear the music queue
+		Command group: Music
+		Usage: {command_prefix}clear
+		Example: {command_prefix}clear
+		'''
+		self.music_queue = []
+		await message.channel.send('```css\nQueue cleared```')
 
 	@message_voice_filter
 	async def cmd_stop(self, message, *args):
@@ -580,15 +594,15 @@ class Music(MusicPlayer):
 			if r['error']:
 				return
 
-		self.check_sleep(message)
+		mem_count = len(self.voice_channel.members)
+		deaf_count = 0
+		for mem in self.voice_channel.members:
+			if mem.voice.self_deaf:
+				deaf_count += 1
 
-		if len(self.voice_channel.members) == 1:
-			await message.channel.send('```fix\nIt seems no one is listening to me. I\'m leaving ┐(‘～`；)┌``')
-			if self.voice_client.is_connected():
-				if self.voice_client.is_playing():
-					self.voice_client.stop()
-				await self.voice_client.disconnect()
-			await self.cmd_leave()
+		if mem_count == 1 or deaf_count == mem_count - 1:
+			await message.channel.send('```fix\nIt seems no one is listening to me. I\'m leaving ┐(‘～`；)┌```')
+			await self.cmd_leave(message, internal=True)
 			return
 
 		song_info = None
@@ -685,15 +699,6 @@ class Music(MusicPlayer):
 			{command_prefix}request spicaterrible (off vocal)
 			{command_prefix}request aishiteru banzai (prepro piano mix)
 		'''
-		if query == 'check':
-			if message.author.id in self.radio_requests:
-				last_request = self.radio_requests[message.author.id]
-				if time.time() - last_request < 900:
-
-				next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.timezone, minutes=15)
-
-			return
-
 		if message.author.id in self.radio_requests:
 			last_request = self.radio_requests[message.author.id]
 			if self.voice_channel:
@@ -706,7 +711,7 @@ class Music(MusicPlayer):
 
 				if member_count > 2:
 					if time.time() - last_request < 900:
-						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.timezone, minutes=15)
+						next_request = datetime.datetime.fromtimestamp(last_request) + datetime.timedelta(hours=self.time_zone, minutes=15)
 						await message.channel.send(f'```fix\nSorry. You can only request a song every 15 minutes. Your next request available at {next_request.strftime("%Y-%m-%d %H:%M:%S")}```')
 						return
 

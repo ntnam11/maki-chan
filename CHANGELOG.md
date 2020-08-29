@@ -1,5 +1,12 @@
 # Changelogs
 
+## [0.3.4] - 2020-05-03
+### Added
+#### New Commands
+- `clear`
+### Modified
+- changes to song searching method
+
 ## [0.3.3] - 2020-04-30
 ### Added
 #### New Commands
