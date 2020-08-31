@@ -6,13 +6,17 @@ Just another Discord bot in Python (´･ω･`)
 
 [![CircleCI](https://circleci.com/gh/ntnam11/maki-chan/tree/master.svg?style=svg)](https://circleci.com/gh/ntnam11/maki-chan/tree/master)
 
+## **IMPORTANT**
+This repository has been discontinued (and moved to [Gitlab](https://gitlab.com/ntnam11/maki-chan))
+That means further bug fixes and updates won't be applied
+If you're looking for a way to report bugs / improvements, please post it on [Gitlab](https://gitlab.com/ntnam11/maki-chan), or [Dev server](https://discord.gg/MPAsnq3)
+
 ## Getting Started
 
 ### Prerequisites
 
 - Python >= 3.7
 - Discord bot token
-- Youtube Data API v3 API key (for using Music commands)
 
 ### Installing
 
