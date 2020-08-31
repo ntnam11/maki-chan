@@ -188,7 +188,6 @@ class Games:
 			diff_size = diff_size_as
 		else:
 			source = 'Love Live! School Idol Festival'
-			diff_size = diff_size_as
 			
 		await message.channel.send(f'```prolog\nSource: {source}\nDifficulty: {diff.capitalize()}\nImage size: {diff_size[diff]} x {diff_size[diff]}\nNumber of rounds: {card_num}```\nGame starts in 5 seconds. Be ready!')
 
